@@ -135,7 +135,7 @@ def main(config):
     print("Running sensitivity-demand-samples with grid-jump = %s" % grid_jump)
     print("Running sensitivity-demand-samples with num-levels = %s" % num_levels)
     print("Running sensitivity-demand-samples with samples-folder = %s" % samples_folder)
-    print("Running sensitivity-demand-samples with variable-groups = %s" % variable_groups)
+
 
     sampler_parameters = {}
     if method == 'morris':
