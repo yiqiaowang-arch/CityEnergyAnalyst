@@ -30,9 +30,9 @@ def calc_substation_location(input_buildings_shp, output_substations_shp):
     points.to_file(output_substations_shp)
 
 
-def run_as_script():
+def main(config):
     gv = cea.globalvar.GlobalVariables()
-    scenario_path = gv.scenario_reference
+    scenario_path = config.scenario
     locator = cea.inputlocator.InputLocator(scenario=scenario_path)
     input_buildings_shp = locator.get_zone_geometry()
     output_substations_shp = locator.get_connection_point()
@@ -40,4 +40,4 @@ def run_as_script():
 
 
 if __name__ == '__main__':
-    run_as_script()
+    main(cea.config.Configuration())

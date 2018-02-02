@@ -48,9 +48,9 @@ def calc_connectivity_network(path_arcgis_db, streets_shp, connection_point_buil
     arcpy.Merge_management([streets_shp, Newlines], merge)
     arcpy.FeatureToLine_management(merge, potential_network)  # necessary to match vertices
 
-def run_as_script():
+def main(config):
     gv = cea.globalvar.GlobalVariables()
-    scenario_path = gv.scenario_reference
+    scenario_path = config.scenario
     locator = cea.inputlocator.InputLocator(scenario=scenario_path)
 
     streets_shp = locator.get_street_network()  # shapefile with the stations
@@ -61,4 +61,4 @@ def run_as_script():
                               potential_network)
 
 if __name__ == '__main__':
-    run_as_script()
+    main(cea.config.Configuration())
