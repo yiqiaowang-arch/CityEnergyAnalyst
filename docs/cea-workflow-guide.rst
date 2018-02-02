@@ -34,6 +34,7 @@ For this we will run the next tools from PyCharm:
 #. Photovoltaic: run this tool located in CityEnergyAnalyst>cea>technologies>solar>photovoltaic.py
 #. Photovoltaic thermal: run this tool located in CityEnergyAnalyst>cea>technologies>solar>photovoltaic_thermal.py
 #. Sewage: run this tool located in CityEnergyAnalyst>cea>technologies>sewage_heat_exchanger.py
+   (To run the Sewage potential, Step 3 needs to be completed)
 
 After finished, we will visualize the results by either checking the raw data files or launching :doc:`dashboard`.
 
