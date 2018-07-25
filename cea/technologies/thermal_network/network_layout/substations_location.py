@@ -22,10 +22,10 @@ __maintainer__ = "Daren Thomas"
 __email__ = "cea@arch.ethz.ch"
 __status__ = "Production"
 
-def calc_substation_location(input_buildings_shp, output_substations_shp, connected_buildings):
+def calc_substation_location(path_input_buildings_shp, path_output_substations_shp, connected_buildings):
 
     # # get coordinate system and project to WSG 84
-    poly = gdf.from_file(input_buildings_shp)
+    poly = gdf.from_file(path_input_buildings_shp)
     if connected_buildings != []:
         #get only buildings
         poly = poly.loc[poly['Name'].isin(connected_buildings)]
@@ -35,15 +35,15 @@ def calc_substation_location(input_buildings_shp, output_substations_shp, connec
     lon = poly.geometry[0].centroid.coords.xy[0][0]
     lat = poly.geometry[0].centroid.coords.xy[1][0]
 
-    # get coordinate system and re project to UTM
+    # get coordinate system and re-project to UTM
     poly = poly.to_crs(get_projected_coordinate_system(lat, lon))
 
     # create points
     points = poly.copy()
     points.geometry = poly['geometry'].centroid
 
-    # saving result
-    points.to_file(output_substations_shp, driver='ESRI Shapefile')
+    # saving result to `nodes_buildings.shp`
+    points.to_file(path_output_substations_shp, driver='ESRI Shapefile')
 
 
 def main(config):

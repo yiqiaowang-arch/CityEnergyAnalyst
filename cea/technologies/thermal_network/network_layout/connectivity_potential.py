@@ -30,22 +30,34 @@ def calc_connectivity_network(path_arcgis_db, path_streets_shp, path_connection_
     :param path_potential_network: output path shapefile
     :return:
     """
-    # first add distribution network to each building form the roads
+    ## first add distribution network to each building form the roads
 
     arcpy.env.overwriteOutput = True
     spatialReference = arcpy.Describe(path_connection_point_buildings_shp).spatialReference
+    # create temporary layers
     memorybuildings = path_arcgis_db + "\\" + "points"
     merge = path_arcgis_db + "\\" + "merge"
     Newlines = path_arcgis_db + "\\" + "linesToerase"
     Finallines = path_arcgis_db + "\\" + "final_line"
-
+    near_table = path_arcgis_db + "\\" + "near_table"
+    Newpoints = path_arcgis_db + '\\' + "New_points"
+    # write building nodes to points
     arcpy.CopyFeatures_management(path_connection_point_buildings_shp, memorybuildings)
     arcpy.Near_analysis(memorybuildings, path_streets_shp, location=True, angle=True)
-    arcpy.MakeXYEventLayer_management(memorybuildings, "NEAR_X", "NEAR_Y", "Line_Points_Layer", spatialReference)
-    arcpy.FeatureClassToFeatureClass_conversion("Line_Points_Layer", path_arcgis_db, "Line_points")
-    arcpy.Append_management(path_arcgis_db + '\\' + "Line_points", memorybuildings, "No_Test")
+    arcpy.GenerateNearTable_analysis(memorybuildings, path_streets_shp, near_table, location = True, closest = 'ALL', closest_count = 4)
+    arcpy.JoinField_management(near_table, "IN_FID", memorybuildings, "OBJECTID", ["Name"])
+
+    arcpy.MakeXYEventLayer_management(near_table, "NEAR_X", "NEAR_Y", "New_Points_Layer", spatialReference)
+    arcpy.FeatureClassToFeatureClass_conversion("New_Points_Layer", path_arcgis_db, "New_points")
+    arcpy.Append_management(Newpoints, memorybuildings, "No_Test")
+    # create new nodes (Line_points) on streets to connect buildings
+    #arcpy.MakeXYEventLayer_management(memorybuildings, "NEAR_X", "NEAR_Y", "Line_Points_Layer", spatialReference)
+    #arcpy.FeatureClassToFeatureClass_conversion("Line_Points_Layer", path_arcgis_db, "Line_points")
+    # append new nodes to points
+    #arcpy.Append_management(path_arcgis_db + '\\' + "Line_points", memorybuildings, "No_Test")
     arcpy.MakeFeatureLayer_management(memorybuildings, "POINTS_layer")
     arcpy.env.workspace = path_arcgis_db
+    # draw lines between the new nodes and the building nodes
     arcpy.PointsToLine_management(memorybuildings, Newlines, "Name", "#", "NO_CLOSE")
     arcpy.Merge_management([path_streets_shp, Newlines], merge)
     arcpy.FeatureToLine_management(merge, path_potential_network)  # necessary to match vertices
