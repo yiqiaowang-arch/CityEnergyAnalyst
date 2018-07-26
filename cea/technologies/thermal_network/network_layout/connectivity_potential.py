@@ -46,7 +46,7 @@ def calc_connectivity_network(path_arcgis_db, path_streets_shp, path_connection_
     # write building nodes to points
     arcpy.CopyFeatures_management(path_connection_point_buildings_shp, memorybuildings)
     # arcpy.Near_analysis(memorybuildings, path_streets_shp, location=True, angle=True)
-    rank_count = 1
+    rank_count = 2
     arcpy.GenerateNearTable_analysis(memorybuildings, path_streets_shp, near_table, location=True, closest='ALL',
                                      closest_count=rank_count)
     arcpy.JoinField_management(near_table, "IN_FID", memorybuildings, "OBJECTID", ["Name"])
@@ -55,13 +55,14 @@ def calc_connectivity_network(path_arcgis_db, path_streets_shp, path_connection_
     # FIXME: attempt to add lines by NEAR_RANK
     memorybuildings_base = path_arcgis_db + "\\" + "points_base"
     arcpy.CopyFeatures_management(path_connection_point_buildings_shp, memorybuildings_base)
-    rank = 1
+    rank = 2
     lines_to_substations = path_arcgis_db + "\\" + "line_to_substations_%s" % rank
+    new_points_rank = path_arcgis_db + "\\" + "new_points_rank_%s" % rank
 
     arcpy.MakeFeatureLayer_management(Newpoints, "POINTS_layer")
     arcpy.SelectLayerByAttribute_management("POINTS_layer", "NEW_SELECTION", '"NEAR_RANK"=%s' %rank) #FIXME: didnt work
-    #arcpy.CopyFeatures_management("POINTS_layer", "new_points_rank_%s" %rank)
-    arcpy.Append_management(Newpoints, memorybuildings, "No_Test")
+    arcpy.CopyFeatures_management("POINTS_layer", new_points_rank)
+    arcpy.Append_management(new_points_rank, memorybuildings, "No_Test")
     arcpy.MakeFeatureLayer_management(memorybuildings, "POINTS_layer")
     arcpy.env.workspace = path_arcgis_db
     arcpy.PointsToLine_management(memorybuildings, lines_to_substations, "Name", "#", "NO_CLOSE")
