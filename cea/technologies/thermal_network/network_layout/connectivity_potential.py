@@ -19,7 +19,9 @@ __maintainer__ = "Daren Thomas"
 __email__ = "cea@arch.ethz.ch"
 __status__ = "Production"
 
-def calc_connectivity_network(path_arcgis_db, path_streets_shp, path_connection_point_buildings_shp, path_potential_network):
+
+def calc_connectivity_network(path_arcgis_db, path_streets_shp, path_connection_point_buildings_shp,
+                              path_potential_network):
     """
     This script outputs a potential network connecting a series of building points to the closest street network
     the street network is assumed to be a good path to the district heating or cooling network
@@ -43,24 +45,56 @@ def calc_connectivity_network(path_arcgis_db, path_streets_shp, path_connection_
     Newpoints = path_arcgis_db + '\\' + "New_points"
     # write building nodes to points
     arcpy.CopyFeatures_management(path_connection_point_buildings_shp, memorybuildings)
-    arcpy.Near_analysis(memorybuildings, path_streets_shp, location=True, angle=True)
-    arcpy.GenerateNearTable_analysis(memorybuildings, path_streets_shp, near_table, location = True, closest = 'ALL', closest_count = 4)
+    # arcpy.Near_analysis(memorybuildings, path_streets_shp, location=True, angle=True)
+    rank_count = 1
+    arcpy.GenerateNearTable_analysis(memorybuildings, path_streets_shp, near_table, location=True, closest='ALL',
+                                     closest_count=rank_count)
     arcpy.JoinField_management(near_table, "IN_FID", memorybuildings, "OBJECTID", ["Name"])
-
     arcpy.MakeXYEventLayer_management(near_table, "NEAR_X", "NEAR_Y", "New_Points_Layer", spatialReference)
     arcpy.FeatureClassToFeatureClass_conversion("New_Points_Layer", path_arcgis_db, "New_points")
+    # FIXME: attempt to add lines by NEAR_RANK
+    memorybuildings_base = path_arcgis_db + "\\" + "points_base"
+    arcpy.CopyFeatures_management(path_connection_point_buildings_shp, memorybuildings_base)
+    rank = 1
+    lines_to_substations = path_arcgis_db + "\\" + "line_to_substations_%s" % rank
+
+    arcpy.MakeFeatureLayer_management(Newpoints, "POINTS_layer")
+    arcpy.SelectLayerByAttribute_management("POINTS_layer", "NEW_SELECTION", '"NEAR_RANK"=%s' %rank) #FIXME: didnt work
+    #arcpy.CopyFeatures_management("POINTS_layer", "new_points_rank_%s" %rank)
     arcpy.Append_management(Newpoints, memorybuildings, "No_Test")
-    # create new nodes (Line_points) on streets to connect buildings
-    #arcpy.MakeXYEventLayer_management(memorybuildings, "NEAR_X", "NEAR_Y", "Line_Points_Layer", spatialReference)
-    #arcpy.FeatureClassToFeatureClass_conversion("Line_Points_Layer", path_arcgis_db, "Line_points")
-    # append new nodes to points
-    #arcpy.Append_management(path_arcgis_db + '\\' + "Line_points", memorybuildings, "No_Test")
     arcpy.MakeFeatureLayer_management(memorybuildings, "POINTS_layer")
     arcpy.env.workspace = path_arcgis_db
-    # draw lines between the new nodes and the building nodes
-    arcpy.PointsToLine_management(memorybuildings, Newlines, "Name", "#", "NO_CLOSE")
-    arcpy.Merge_management([path_streets_shp, Newlines], merge)
+    arcpy.PointsToLine_management(memorybuildings, lines_to_substations, "Name", "#", "NO_CLOSE")
+    arcpy.Merge_management([path_streets_shp, lines_to_substations], merge) # FIXME: check if repeat
+
+
+    # for i in range(rank_count):
+    #     rank = i + 1
+    #     lines_to_substations = path_arcgis_db + "\\" + "line_to_substations_%s" % rank
+    #
+    #     arcpy.MakeFeatureLayer_management(Newpoints, "POINTS_layer")
+    #     arcpy.SelectLayerByAttribute_management("POINTS_layer", "NEW_SELECTION", '"NEAR_RANK"=%s' %rank)
+    #     #arcpy.CopyFeatures_management("POINTS_layer", "new_points_rank_%s" %rank)
+    #     arcpy.Append_management(Newpoints, memorybuildings, "No_Test")
+    #     arcpy.MakeFeatureLayer_management(memorybuildings, "POINTS_layer")
+    #     arcpy.env.workspace = path_arcgis_db
+    #     arcpy.PointsToLine_management(memorybuildings, lines_to_substations, "Name", "#", "NO_CLOSE")
+    #     arcpy.Merge_management([path_streets_shp, lines_to_substations], merge) # FIXME: check if repeat
+
+    # arcpy.Append_management(Newpoints, memorybuildings, "No_Test")
+    #
+    # # create new nodes (Line_points) on streets to connect buildings
+    # # arcpy.MakeXYEventLayer_management(memorybuildings, "NEAR_X", "NEAR_Y", "Line_Points_Layer", spatialReference)
+    # # arcpy.FeatureClassToFeatureClass_conversion("Line_Points_Layer", path_arcgis_db, "Line_points")
+    # # append new nodes to points
+    # # arcpy.Append_management(path_arcgis_db + '\\' + "Line_points", memorybuildings, "No_Test")
+    # arcpy.MakeFeatureLayer_management(memorybuildings, "POINTS_layer")
+    # arcpy.env.workspace = path_arcgis_db
+    # # draw lines between the new nodes and the building nodes
+    # arcpy.PointsToLine_management(memorybuildings, Newlines, "Name", "#", "NO_CLOSE")
+    # arcpy.Merge_management([path_streets_shp, Newlines], merge)
     arcpy.FeatureToLine_management(merge, path_potential_network)  # necessary to match vertices
+
 
 def main(config):
     assert os.path.exists(config.scenario), 'Scenario not found: %s' % config.scenario
@@ -72,6 +106,7 @@ def main(config):
     path_default_arcgis_db = os.path.expanduser(os.path.join('~', 'Documents', 'ArcGIS', 'Default.gdb'))
     calc_connectivity_network(path_default_arcgis_db, path_streets_shp, path_connection_point_buildings_shp,
                               path_potential_network)
+
 
 if __name__ == '__main__':
     main(cea.config.Configuration())
