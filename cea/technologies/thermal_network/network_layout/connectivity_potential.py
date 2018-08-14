@@ -60,11 +60,13 @@ def calc_connectivity_network(path_arcgis_db, path_streets_shp, path_connection_
         lines_to_substations = path_arcgis_db + "\\" + "line_to_substations_%s" % rank
         new_points_rank = path_arcgis_db + "\\" + "new_points_rank_%s" % rank
 
+        # create a layer of new street nodes for each rank in the near table
         arcpy.MakeFeatureLayer_management(Newpoints, "POINTS_layer")
         arcpy.SelectLayerByAttribute_management("POINTS_layer", "NEW_SELECTION", '"NEAR_RANK"=%s' %rank)
         arcpy.CopyFeatures_management("POINTS_layer", new_points_rank)
         arcpy.Append_management(new_points_rank, memorybuildings_base, "No_Test")
         arcpy.MakeFeatureLayer_management(memorybuildings_base, "POINTS_layer")
+        # create lines to connect building nodes to the new street nodes
         arcpy.env.workspace = path_arcgis_db
         arcpy.PointsToLine_management(memorybuildings_base, lines_to_substations, "Name", "#", "NO_CLOSE") # FIXME: the problem is that when i = 2, the lines_to_substations are still messed up
         arcpy.Merge_management([path_streets_shp, lines_to_substations], merge)
