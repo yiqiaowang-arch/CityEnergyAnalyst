@@ -25,6 +25,7 @@ def network_layout(config, locator, plant_building_names, output_name_network=""
     create_plant = config.network_layout.create_plant
     input_buildings_shp = locator.get_zone_geometry()
     connected_buildings = config.network_layout.buildings
+    plant_next_to_buildings = config.network_layout.plant_buildings
     output_substations_shp = locator.get_temporary_file("nodes_buildings.shp")
     path_streets_shp = locator.get_street_network()  # shapefile with the stations
     path_potential_network = locator.get_temporary_file("potential_network.shp")  # shapefile, location of output.
@@ -45,6 +46,13 @@ def network_layout(config, locator, plant_building_names, output_name_network=""
     # calc_minimum_spanning_tree(path_potential_network, output_network_folder, output_substations_shp, output_edges,
     #                            output_nodes, weight_field, type_mat_default, pipe_diameter_default)
     disconnected_building_names = config.thermal_network.disconnected_buildings
+    if plant_next_to_buildings != '':
+        if plant_building_names == []:
+            plant_building_names.append(plant_next_to_buildings)
+        else:
+            raise ValueError(
+                'The plant locations are over-specified! Please make sure plant-next-to-building is left blank when running thermal_network_optimization.')
+
     calc_steiner_spanning_tree(path_potential_network, output_network_folder, output_substations_shp, output_edges,
                                output_nodes, weight_field, type_mat_default, pipe_diameter_default, type_network,
                                total_demand_location, create_plant, config.network_layout.allow_looped_networks,

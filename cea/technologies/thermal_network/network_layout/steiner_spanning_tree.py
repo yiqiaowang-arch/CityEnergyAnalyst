@@ -94,9 +94,15 @@ def calc_steiner_spanning_tree(input_network_shp, output_network_folder, buildin
         mst_edges.drop(['weight'], inplace=True, axis=1)
     if create_plant:
         if optimization_flag == False:
-            building_anchor = calc_coord_anchor(total_demand_location, new_mst_nodes, type_network)
-            new_mst_nodes, mst_edges = add_plant_close_to_anchor(building_anchor, new_mst_nodes, mst_edges,
-                                                                 type_mat_default, pipe_diameter_default)
+            if plant_building_names == []: # place plant anchor load
+                building_anchor = calc_coord_anchor(total_demand_location, new_mst_nodes, type_network)
+                new_mst_nodes, mst_edges = add_plant_close_to_anchor(building_anchor, new_mst_nodes, mst_edges,
+                                                                     type_mat_default, pipe_diameter_default)
+            else: # place plant at specified buildings
+                for building in plant_building_names:
+                    building_anchor = building_node_from_name(building, new_mst_nodes)
+                    new_mst_nodes, mst_edges = add_plant_close_to_anchor(building_anchor, new_mst_nodes, mst_edges,
+                                                                         type_mat_default, pipe_diameter_default)
         else:
             for building in plant_building_names:
                 building_anchor = building_node_from_name(building, new_mst_nodes)
@@ -104,8 +110,7 @@ def calc_steiner_spanning_tree(input_network_shp, output_network_folder, buildin
                                                                      type_mat_default, pipe_diameter_default)
 
     new_mst_nodes.drop(["FID", "coordinates", 'floors_bg', 'floors_ag', 'height_bg', 'height_ag', 'geometry_y'],
-                       axis=1,
-                       inplace=True)
+                       axis=1, inplace=True)
 
     nx.write_shp(mst_non_directed, output_network_folder)
 
