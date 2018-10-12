@@ -67,8 +67,8 @@ def calc_Capex_a_network_pipes(network_info):
         InvC = network_info.network_features.pipesCosts_DCN
     # Assume lifetime of 25 years and 5 % IR
     Inv_IR = 0.05
-    Inv_LT = 20
-    Capex_a_netw = InvC * (Inv_IR) * (1 + Inv_IR) ** Inv_LT / ((1 + Inv_IR) ** Inv_LT - 1)
+    Inv_LT = 25
+    Capex_a_netw = InvC * (Inv_IR) * (1 + Inv_IR) ** Inv_LT / (((1 + Inv_IR) ** Inv_LT) - 1)
     return Capex_a_netw
 
 

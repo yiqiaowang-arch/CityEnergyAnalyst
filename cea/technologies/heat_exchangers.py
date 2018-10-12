@@ -144,6 +144,6 @@ def calc_Cinv_HEX_hisaka(network_info):
             InvC = cost
 
             Capex_a = Capex_a + InvC * (Inv_IR) * (1 + Inv_IR) ** Inv_LT / ((1 + Inv_IR) ** Inv_LT - 1)
-            Opex_a_fixed = Opex_a_fixed + Capex_a * Inv_OM
+            Opex_a_fixed = Opex_a_fixed + InvC * Inv_OM
 
     return Capex_a, Opex_a_fixed
