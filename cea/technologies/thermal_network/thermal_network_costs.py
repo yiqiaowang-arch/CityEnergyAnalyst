@@ -169,7 +169,7 @@ def calc_Ctot_cooling_plants(network_info):
                 Opex_var_chiller += abs(
                     plant_heat_yearly_kWh) / COP_plant * 1000 * network_info.prices.ELEC_PRICE
                 #Opex_var_CT += CTModel.calc_CT_yearly(plant_heat_yearly_kWh)
-                Opex_var_CT += 0 #FIXME: temporary
+                Opex_var_CT += 0 #FIXME: temporary, since the annual CT operation cost is not verified yet
             else:
                 # calculates operation costs with hourly simulation
                 for t in range(HOURS_IN_YEAR):
