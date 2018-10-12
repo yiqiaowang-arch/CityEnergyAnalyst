@@ -353,6 +353,7 @@ def find_non_zero_demand_systems(network_info, t, disconnected_demand):
                     if abs(disconnected_demand[building][system][t]) > 0:
                         if network_info.full_cooling_systems[system_index] not in systems:
                             systems.append(network_info.full_cooling_systems[system_index])
+                            
     return systems
 
 
