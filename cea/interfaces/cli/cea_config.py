@@ -21,7 +21,6 @@ __status__ = "Production"
 
 def main(config=None):
     """
-
     :param cea.config.Configuration config: the configuration file to use (instead of creating a new one)
     :return:
     """

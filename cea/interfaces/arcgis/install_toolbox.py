@@ -131,7 +131,6 @@ def get_arcgis_paths():
     - bin
     - arcpy
     - scripts
-
     as subfolders of the installation directory.
     """
     import _winreg

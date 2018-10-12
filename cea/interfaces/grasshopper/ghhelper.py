@@ -1,8 +1,6 @@
 """
 A library of helper-functions for working with the CEA from grasshopper. Install this with ``cea install-grasshopper``.
-
 The main function used is ``run`` which runs a CEA script (as defined in the ``scripts.yml``)
-
 .. note:: This module is meant to be run from grasshopper, which uses an IronPython interpreter. PyCharm will have a
     hard time with some of the imports here.
 """
@@ -30,10 +28,8 @@ subprocess.STARTF_USESHOWWINDOW = 1
 
 def run(script, args):
     """Run a script, given a config file.
-
     :param script: a script name, as defined in the ``scripts.yml`` file
     :type script: basestring
-
     :param args: a dictionary consisting of ``name = value`` pairs, one per line, for each parameter to override
         the value should be formatted as it would be in the config file.
     :type args: dict[str, str]

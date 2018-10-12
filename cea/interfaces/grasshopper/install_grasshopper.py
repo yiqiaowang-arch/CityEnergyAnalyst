@@ -23,10 +23,8 @@ __status__ = "Production"
 def main(_):
     """
     Install a subset of the CEA for use inside grasshopper Python scripts.
-
     Since we don't know for sure, if ``cea install-toolbox`` (for the ArcGIS interface) was run, we need to re-create
     some stuff done there too, like storing the path to the python executable to use.
-
     :param _: ignored.
     :type _: cea.config.Configuration
     :return:

@@ -1,7 +1,6 @@
 """
 This file implements the ``cea`` command line interface script. Basically, it uses the first argument passed to
 it to look up a module to import in ``scripts.yml``, imports that and then calls the ``main`` function on that module.
-
 The rest of the command line arguments are passed to the ``cea.config.Configuration`` object for processing.
 """
 
@@ -26,7 +25,6 @@ __status__ = "Production"
 
 def main(config=None):
     """
-
     :param cea.config.Configuration config: the configuration file to use (instead of creating a new one)
     :return:
     """
