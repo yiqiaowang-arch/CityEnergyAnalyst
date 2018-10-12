@@ -292,12 +292,19 @@ class InputLocator(object):
         return self._ensure_folder(self.get_optimization_network_results_folder(), str(generation))
 
 
-    def get_optimization_network_individual_results_file(self, network_type, generation_number, individual_number):
+    def get_optimization_network_individual_results_file(self, network_type, individual):
         """scenario/outputs/data/optimization/network/layout/DH_T_Return.csv or DC_T_Return.csv
         Folder to results file of this generation
         """
-        return os.path.join(self.get_optimization_network_generation_folder(generation_number),
-                        network_type + "_" + str(individual_number) + ".csv")
+        return os.path.join(self.get_optimization_network_results_folder(),
+                        network_type + "_" + str(individual) + ".csv")
+
+    def get_optimization_network_generation_individuals_results_file(self, network_type, generation):
+        """scenario/outputs/data/optimization/network/layout/DH_T_Return.csv or DC_T_Return.csv
+        Folder to results file of this generation
+        """
+        return os.path.join(self.get_optimization_network_results_folder(),
+                            network_type + '_' + str(generation) + "_individuals.csv")
 
     def get_optimization_network_all_individuals_results_file(self, network_type):
         """scenario/outputs/data/optimization/network/layout/DH_T_Return.csv or DC_T_Return.csv
@@ -491,6 +498,10 @@ class InputLocator(object):
         weather_names = [os.path.splitext(f)[0] for f in os.listdir(self.weather_path)]
         return weather_names
 
+    def get_weather_dict(self):
+        """Return a dictionary with weather_name -> weather_path for the builtin weather files"""
+        return {name: self.get_weather(name) for name in self.get_weather_names()}
+
     def get_weather_folder(self):
         return self._ensure_folder(self.get_input_folder(),'weather')
 
@@ -595,7 +606,7 @@ class InputLocator(object):
 
     def check_cpg(self, shapefile_path):
         #ensures that the CPG file is the correct one
-        from cea.utilities.standarize_coordinates import ensure_cpg_file
+        from cea.utilities.standardize_coordinates import ensure_cpg_file
         ensure_cpg_file(shapefile_path)
 
     def get_zone_building_names(self):
