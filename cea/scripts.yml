@@ -201,6 +201,13 @@ Thermal networks:
   parameters: ['general:scenario', 'general:region', 'general:weather', 'general:multiprocessing',
                'general:number-of-cpus-to-keep-free', 'thermal-network', 'thermal-network-optimization:use-representative-week-per-month']
 
+- name: thermal-network-costs
+  label: Thermal Network Costs
+  description: Calculates capital and operation costs of thermal networks after simulation.
+  interfaces: [cli, arcgis, dashboard]
+  module: cea.technologies.thermal_network.thermal_network_costs
+  parameters: ['general:scenario', 'general:region', 'general:weather', 'thermal-network:network-type', 'thermal-network:disconnected-buildings',
+               'thermal-network-optimization']
 
 Utilities:
 
