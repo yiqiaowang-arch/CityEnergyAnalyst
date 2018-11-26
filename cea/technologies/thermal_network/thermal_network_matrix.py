@@ -456,11 +456,9 @@ def thermal_network_main(locator, network_type, network_name, file_type, set_dia
                                                                                    thermal_network.t_target_supply_C)  # (1 x n)
 
     if config.thermal_network_optimization.use_representative_week_per_month:
-        hours_list = range(0, 168) + range(744, 912) + range(1416, 1584) + range(2160, 2328) + range(2880,
-                                                                                                     3048) + range(3624,
-                                                                                                                   3792) + range(
-            4344, 4512) + range(5088, 5256) + range(5832,
-                                                    6000) + range(6522, 6690) + range(7296, 7464) + range(8016, 8184)
+        hours_list = range(0, 168) + range(744, 912) + range(1416, 1584) + range(2160, 2328) + range(2880, 3048) +\
+                     range(3624, 3792) + range(4344, 4512) + range(5088, 5256) + range(5832, 6000) + \
+                     range(6522, 6690) + range(7296, 7464) + range(8016, 8184)
         # cut out relevant parts of all dataframes
         thermal_network.T_ground_K = [value for index, value in enumerate(thermal_network.T_ground_K) if
                                       index in hours_list]
@@ -516,8 +514,7 @@ def thermal_network_main(locator, network_type, network_name, file_type, set_dia
     b_p = HEX_prices['b']['District substation heat exchanger']
     c_p = HEX_prices['c']['District substation heat exchanger']
     d_p = HEX_prices['d']['District substation heat exchanger']
-    e_p = HEX_prices['e'][
-        'District substation heat exchanger']  # make this into list, add readout in pressure loss calc
+    e_p = HEX_prices['e']['District substation heat exchanger']  # make this into list, add readout in pressure loss calc
     thermal_network.pressure_loss_coeff = [a_p, b_p, c_p, d_p, e_p]
 
     print('Solving hydraulic and thermal network')
@@ -2231,6 +2228,9 @@ def solve_network_temperatures(thermal_network, t, region):
 
         # initialize target temperatures in Kelvin as initial value for K_value calculation
         initial_guess_temp = np.asarray(thermal_network.t_target_supply_df.loc[t] + 273.15, order='C')
+        if math.isnan(initial_guess_temp.max()):
+            raise AssertionError('The target temperautre at timestep', t, 'is not matched with the flow condition '
+                                 'in the network.')
         t_edge__k = calc_edge_temperatures(initial_guess_temp, edge_node_df.copy())
 
         # initialization of K_value
