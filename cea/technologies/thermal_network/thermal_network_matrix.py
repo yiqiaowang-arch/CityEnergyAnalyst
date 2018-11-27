@@ -2228,7 +2228,7 @@ def solve_network_temperatures(thermal_network, t, region):
 
         # initialize target temperatures in Kelvin as initial value for K_value calculation
         initial_guess_temp = np.asarray(thermal_network.t_target_supply_df.loc[t] + 273.15, order='C')
-        if math.isnan(initial_guess_temp.max()):
+        if math.isnan(np.nanmax(initial_guess_temp)):
             raise AssertionError('The target temperautre at timestep', t, 'is not matched with the flow condition '
                                  'in the network.')
         t_edge__k = calc_edge_temperatures(initial_guess_temp, edge_node_df.copy())
