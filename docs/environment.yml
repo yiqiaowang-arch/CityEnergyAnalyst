@@ -4,6 +4,7 @@ channels:
 - defaults
 dependencies:
 - numpy
+- geopandas
 - pandas
 - pyaml
 - pip:
