@@ -2602,6 +2602,10 @@ def calc_supply_temperatures(t_ground__k, edge_node_df, mass_flow_df, k, t_targe
 
             delta_temp_0 = np.max(abs(t_e_out_old - t_e_out))
             temp_iter = temp_iter + 1
+            if temp_iter > 20:
+                print('Supply temperature iteration exit at iteration #', temp_iter, ', with delta_temp_0=', delta_temp_0,
+                      '\n Node supply temperatures: ', t_target_supply__c.dropna())
+                delta_temp_0 = 0.9 # to exit the iteration
 
         # # iterate the plant supply temperature until all the node temperature reaches the target temperatures
         if network_type == 'DH':
@@ -2908,6 +2912,10 @@ def calc_return_temperatures(t_ground, edge_node_df, mass_flow_df, mass_flow_sub
 
         delta_temp_0 = np.max(abs(t_e_out_old - t_e_out))
         temp_iter = temp_iter + 1
+        if temp_iter > 20:
+            print('Return temperature iteration exit at iteration #', temp_iter, ', with delta_temp_0=', delta_temp_0,
+                  '\n Node supply temperatures: ', t_return.dropna())
+            delta_temp_0 = 0.9  # to exit the iteration
 
     return t_node, q_loss_edges_kW
 
