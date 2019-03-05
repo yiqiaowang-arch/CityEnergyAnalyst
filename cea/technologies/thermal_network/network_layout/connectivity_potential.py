@@ -7,7 +7,7 @@ import os
 
 from geopandas import GeoDataFrame as gdf
 from shapely.geometry import Point, LineString, MultiPoint, box
-from shapely.ops import split, linemerge
+from shapely.ops import split, linemerge, snap
 
 import cea.config
 import cea.globalvar
@@ -73,12 +73,10 @@ def computer_end_points(lines, crs):
 
 def nearest_neighbor_within(others, point, max_distance):
     """Find nearest point among others up to a maximum distance.
-
     Args:
         others: a list of Points or a MultiPoint
         point: a Point
         max_distance: maximum distance to search for the nearest neighbor
-
     Returns:
         A shapely Point if one is within max_distance, None otherwise
     """
@@ -99,10 +97,8 @@ def nearest_neighbor_within(others, point, max_distance):
 
 def find_isolated_endpoints(lines):
     """Find endpoints of lines that don't touch another line.
-
     Args:
         lines: a list of LineStrings or a MultiLineString
-
     Returns:
         A list of line end Points that don't touch any other line of lines
     """
@@ -122,12 +118,10 @@ def find_isolated_endpoints(lines):
 
 def bend_towards(line, where, to):
     """Move the point where along a line to the point at location to.
-
     Args:
         line: a LineString
         where: a point ON the line (not necessarily a vertex)
         to: a point NOT on the line where the nearest vertex will be moved to
-
     Returns:
         the modified (bent) line
     """
@@ -162,7 +156,6 @@ def vertices_from_lines(lines):
 
 def snappy_endings(lines, max_distance, crs):
     """Snap endpoints of lines together if they are at most max_length apart.
-
     Args:
         lines: a list of LineStrings or a MultiLineString
         max_distance: maximum distance two endpoints may be joined together
@@ -215,7 +208,6 @@ def split_line_by_nearest_points(gdf_line, gdf_points, tolerance, crs):
         geodataframe with multiple rows of connecting line segments
     gdf_points : geoDataFrame
         geodataframe with multiple rows of single points
-
     Returns
     -------
     gdf_segments : geoDataFrame
@@ -233,7 +225,7 @@ def split_line_by_nearest_points(gdf_line, gdf_points, tolerance, crs):
     # returns GeometryCollection
     # snap_points = snap(coords, line, tolerance)
     # snap_points._crs = crs
-    split_line = split(line, snap_points)
+    split_line = split(line, snap(snap_points, line, tolerance))
     split_line._crs = crs
     segments = [feature for feature in split_line if feature.length > 0.01]
 
@@ -241,6 +233,30 @@ def split_line_by_nearest_points(gdf_line, gdf_points, tolerance, crs):
     # gdf_segments.columns = ['index', 'geometry']
 
     return gdf_segments
+
+
+def nearest_neighbor_within(others, point, max_distance):
+    """Find nearest point among others up to a maximum distance.
+    Args:
+        others: a list of Points or a MultiPoint
+        point: a Point
+        max_distance: maximum distance to search for the nearest neighbor
+    Returns:
+        A shapely Point if one is within max_distance, None otherwise
+    """
+    search_region = point.buffer(max_distance)
+    interesting_points = search_region.intersection(MultiPoint(others))
+
+    if not interesting_points:
+        closest_point = None
+    elif isinstance(interesting_points, Point):
+        closest_point = interesting_points
+    else:
+        distances = [point.distance(ip) for ip in interesting_points
+                     if point.distance(ip) > 0]
+        closest_point = interesting_points[distances.index(min(distances))]
+
+    return closest_point
 
 
 def near_analysis(buiding_centroids, street_network, crs):
@@ -266,7 +282,7 @@ def near_analysis(buiding_centroids, street_network, crs):
 
 
 def snap_points(points, lines, crs):
-    tolerance = 0.05
+    tolerance = 0.5
     length = lines.shape[0]
     for i in range(length):
         for point in points.geometry:
@@ -279,8 +295,8 @@ def snap_points(points, lines, crs):
             if (point.x, point.y) in line.coords:
                 x = "nothing"
             else:
-                if distance_to_line > 0.0 and distance_to_line < tolerance:
-                    buff = point.buffer(0.02)
+                if  distance_to_line < tolerance:
+                    buff = point.buffer(0.1)
                     ### Split the line on the buffer
                     geometry = split(line, buff)
                     geometry._crs = crs
@@ -304,14 +320,11 @@ def snap_points(points, lines, crs):
 
 def one_linestring_per_intersection(lines, crs):
     """ Move line endpoints to intersections of line segments.
-
     Given a list of touching or possibly intersecting LineStrings, return a
     list LineStrings that have their endpoints at all crossings and
     intersecting points and ONLY there.
-
     Args:
         a list of LineStrings or a MultiLineString
-
     Returns:
         a list of LineStrings
     """
@@ -351,6 +364,12 @@ def create_terminals(buiding_centroids, crs, street_network):
     # Aggregate these points with the GroupBy
     lines_to_buildings = all_points.groupby(['Name'])['geometry'].apply(lambda x: LineString(x.tolist()))
     lines_to_buildings = gdf(lines_to_buildings, geometry='geometry', crs=crs)
+
+
+
+
+    lines_to_buildings = lines_to_buildings.append(street_network).reset_index(drop=True)
+    lines_to_buildings.crs = crs
     return lines_to_buildings
 
 
@@ -384,7 +403,6 @@ def calc_connectivity_network(path_streets_shp, path_connection_point_buildings_
     """
     This script outputs a potential network connecting a series of building points to the closest street network
     the street network is assumed to be a good path to the district heating or cooling network
-
     :param path_streets_shp: path to street shapefile
     :param path_connection_point_buildings_shp: path to substations in buildings (or close by)
     :param path_potential_network: output path shapefile
@@ -401,17 +419,17 @@ def calc_connectivity_network(path_streets_shp, path_connection_point_buildings_
     street_network = street_network.to_crs(get_projected_coordinate_system(lat, lon))
     crs = street_network.crs
 
-    # decrease the number of units of the points
+    # # decrease the number of units of the points
     tolerance = 6
     buiding_centroids = simplify_points_accurracy(buiding_centroids, tolerance, crs)
     street_network = simplify_liness_accurracy(street_network.geometry.values, tolerance, crs)
 
     # create terminals/branches form street to buildings
-    lines_to_buildings = create_terminals(buiding_centroids, crs, street_network)
+    prototype_network = create_terminals(buiding_centroids, crs, street_network)
+    config = cea.config.Configuration()
+    locator=cea.inputlocator.InputLocator(scenario=config.scenario)
+    prototype_network.to_file(locator.get_temporary_file("prototype_network.shp"), driver='ESRI Shapefile')
 
-    # combine streets and branches
-    prototype_network = lines_to_buildings.append(street_network).reset_index(drop=True)
-    prototype_network.crs = crs
 
     # first split in intersections
     prototype_network = one_linestring_per_intersection(prototype_network.geometry.values,
@@ -426,7 +444,6 @@ def calc_connectivity_network(path_streets_shp, path_connection_point_buildings_
     # snap these points to the lines and transform lines
     gdf_points_snapped, prototype_network = snap_points(gdf_points_snapped, prototype_network,
                                                         crs)
-
     # get segments
     gdf_segments = split_line_by_nearest_points(prototype_network, gdf_points_snapped, 1.0, crs)
 
