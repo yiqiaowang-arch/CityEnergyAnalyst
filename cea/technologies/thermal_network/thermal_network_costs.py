@@ -133,7 +133,9 @@ def calc_Ctot_cooling_plants(network_info):
     Opex_fixed_plant = 0.0
     Capex_a_chiller = 0.0
     Capex_a_CT = 0.0
-
+    number_of_chillers = 0
+    number_of_CT = 0
+    max_chiller_size = 0.0
 
     # calculate cost of chiller heat production and chiller capex and opex
     for plant_number in range(number_of_plants):  # iterate through all plants
@@ -159,6 +161,7 @@ def calc_Ctot_cooling_plants(network_info):
             peak_demand_W = plant_heat_peak_kW * 1000  # convert to W
             print 'Calculating cost of heat production at plant number: ', (plant_number + 1)
             if network_info.config.thermal_network_optimization.yearly_cost_calculations:
+                print 'calculates operation costs with yearly approximation'
                 # calculates operation costs with yearly approximation
 
                 # check which systems are supplied by cooling plants, this is either defined by the optimization
@@ -171,8 +174,10 @@ def calc_Ctot_cooling_plants(network_info):
                 Opex_var_plant += abs(
                     plant_heat_yearly_kWh) / COP_plant * 1000 * network_info.prices.ELEC_PRICE
             else:
+                print 'calculates operation costs with hourly simulation'
                 # calculates operation costs with hourly simulation
                 for t in range(HOURS_IN_YEAR):
+                    print t
                     #     calculate COP of plant operation in this hour based on supplied loads
                     #     Depending on the demand of that hour, the COP will change.
                     #     E.g. supplied systems = ahu, aru:
@@ -191,16 +196,16 @@ def calc_Ctot_cooling_plants(network_info):
 
             # calculate equipment cost of chiller and cooling tower
 
-            Capex_a_chiller_USD, Opex_fixed_chiller, _ = VCCModel.calc_Cinv_VCC(peak_demand_W, network_info.locator,
+            Capex_a_chiller_USD, Opex_fixed_chiller, _,number_of_chillers, max_chiller_size = VCCModel.calc_Cinv_VCC(peak_demand_W, network_info.locator,
                                                       network_info.config, 'CH1')
-            Capex_a_CT_USD, Opex_fixed_CT, _ = CTModel.calc_Cinv_CT(peak_demand_W, network_info.locator,
+            Capex_a_CT_USD, Opex_fixed_CT, _, number_of_CT = CTModel.calc_Cinv_CT(peak_demand_W, network_info.locator,
                                                network_info.config, 'CT1')
         # sum over all plants
         Capex_a_chiller += Capex_a_chiller_USD
         Capex_a_CT += Capex_a_CT_USD
         Opex_fixed_plant += Opex_fixed_chiller + Opex_fixed_CT
 
-    return Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT
+    return Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size
 
 
 def calc_Ctot_cs_disconnected_loads(network_info):
@@ -459,7 +464,11 @@ def calc_Ctot_cs_district(network_info):
     # Network Pumps
     Capex_a_pump, Opex_fixed_pump, Opex_var_pump = calc_Ctot_network_pump(network_info)
     # Centralized plant
-    Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT = calc_Ctot_cooling_plants(network_info)
+    Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size = calc_Ctot_cooling_plants(network_info)
+    print 'number_of_chillers =', number_of_chillers
+    print 'number_of_CT =', number_of_CT
+    print 'plant_heat_peak_kWh =', round (plant_heat_peak_kW, 2), '[kWh]'
+    print 'max_chiller_size_W =', max_chiller_size
     if Opex_var_plant < 1:
         # no heat supplied by centralized plant/network, this makes sure that the network cost is 0.
         Capex_a_netw = 0
@@ -500,7 +509,8 @@ def calc_Ctot_cs_district(network_info):
     cost_storage_df.ix['opex_dis_build'][0] = Opex_tot_dis_buildings
     cost_storage_df.ix['el_network_MWh'][0] = el_MWh
 
-    return Capex_a_total, Opex_total, Costs_total, cost_storage_df
+
+    return Capex_a_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size
 
 
 def find_cooling_systems_string(disconnected_systems):
@@ -576,18 +586,20 @@ def main(config):
         raise ValueError('Disconnected buildings are specified in cea.config, please remove it! (see NOTE above)')
 
     # calculate total network costs
-    Capex_total, Opex_total, Costs_total, cost_storage_df = calc_Ctot_cs_district(network_info)
+    Capex_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size = calc_Ctot_cs_district(network_info)
 
     # calculate network total length and average diameter
     length_m, average_diameter_m = calc_network_size(network_info)
 
-    # calculate annual space cooling demands
+    # calculate annual space cooling demands and chiller capacity factor
     if network_type == 'DC':
         annual_demand_district_MWh = total_demand['Qcs_sys_MWhyr'].sum()
         annual_demand_disconnected_MWh = 0
         for building_index in disconnected_buildings_index:
             annual_demand_disconnected_MWh += total_demand.ix[building_index, 'Qcs_sys_MWhyr']
         annual_demand_network_MWh = annual_demand_district_MWh - annual_demand_disconnected_MWh
+        chiller_capacity_factor = (annual_demand_district_MWh*1000000) /(number_of_chillers*max_chiller_size*8760)
+        print 'chiller_capacity_factor', round (chiller_capacity_factor, 2)
     else:
         raise ValueError('This optimization procedure is not ready for district heating yet!')
 
@@ -615,6 +627,10 @@ def main(config):
     cost_output['capex_CT'] = round(cost_storage_df.ix['capex_CT'][0], 2)
     cost_output['avg_diam_m'] = average_diameter_m
     cost_output['network_length_m'] = length_m
+    cost_output['number_of_chillers'] = number_of_chillers
+    cost_output['number_of_CT'] = number_of_CT
+    cost_output['peak_demand_kWh']= round(plant_heat_peak_kW, 2)
+    cost_output['chiller_capacity_factor'] = round (chiller_capacity_factor, 2)
     cost_output = pd.DataFrame.from_dict(cost_output, orient='index').T
     cost_output.to_csv(locator.get_optimization_network_layout_costs_file(config.thermal_network.network_type))
     return

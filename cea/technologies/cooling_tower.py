@@ -92,6 +92,7 @@ def calc_Cinv_CT(CT_size_W, locator, config, technology_type):
     Capex_a_CT_USD = 0.0
     Opex_fixed_CT_USD = 0.0
     Capex_CT_USD = 0.0
+    number_of_CT = 0
 
     if CT_size_W > 0:
         CT_cost_data = pd.read_excel(locator.get_supply_systems(), sheet_name="CT")
@@ -103,6 +104,7 @@ def calc_Cinv_CT(CT_size_W, locator, config, technology_type):
         if CT_size_W < CT_cost_data.iloc[0]['cap_min']:
             CT_size_W = CT_cost_data.iloc[0]['cap_min']
         if CT_size_W <= max_chiller_size:
+            number_of_CT = 1
             CT_cost_data = CT_cost_data[
                 (CT_cost_data['cap_min'] <= CT_size_W) & (CT_cost_data['cap_max'] > CT_size_W)]
 
@@ -124,6 +126,7 @@ def calc_Cinv_CT(CT_size_W, locator, config, technology_type):
         else:
             number_of_chillers = int(ceil(CT_size_W / max_chiller_size))
             Q_nom_each_CT = CT_size_W / number_of_chillers
+            number_of_CT = number_of_chillers
 
             for i in range(number_of_chillers):
                 CT_cost_data = CT_cost_data[
@@ -142,7 +145,7 @@ def calc_Cinv_CT(CT_size_W, locator, config, technology_type):
                 Opex_fixed_CT_USD = Opex_fixed_CT_USD + Capex_a1 * Inv_OM
                 Capex_CT_USD = Capex_CT_USD + InvC
 
-    return Capex_a_CT_USD, Opex_fixed_CT_USD, Capex_CT_USD
+    return Capex_a_CT_USD, Opex_fixed_CT_USD, Capex_CT_USD, number_of_CT
 
 
 

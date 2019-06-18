@@ -111,6 +111,7 @@ def calc_Cinv_VCC(qcold_W, locator, config, technology_type):
     Capex_a_VCC_USD = 0
     Opex_fixed_VCC_USD = 0
     Capex_VCC_USD = 0
+    number_of_chillers = 0
 
     if qcold_W > 0:
         VCC_cost_data = pd.read_excel(locator.get_supply_systems(), sheet_name="Chiller")
@@ -121,6 +122,7 @@ def calc_Cinv_VCC(qcold_W, locator, config, technology_type):
         if qcold_W < VCC_cost_data.iloc[0]['cap_min']:
             qcold_W = VCC_cost_data.iloc[0]['cap_min']
         if qcold_W <= max_chiller_size:
+            number_of_chillers = 1
             VCC_cost_data = VCC_cost_data[(VCC_cost_data['cap_min'] <= qcold_W) & (VCC_cost_data['cap_max'] > qcold_W)]
             Inv_a = VCC_cost_data.iloc[0]['a']
             Inv_b = VCC_cost_data.iloc[0]['b']
@@ -155,7 +157,7 @@ def calc_Cinv_VCC(qcold_W, locator, config, technology_type):
                 Opex_fixed_VCC_USD = Opex_fixed_VCC_USD + Capex_a1 * Inv_OM
                 Capex_VCC_USD = Capex_VCC_USD + InvC
 
-    return Capex_a_VCC_USD, Opex_fixed_VCC_USD, Capex_VCC_USD
+    return Capex_a_VCC_USD, Opex_fixed_VCC_USD, Capex_VCC_USD, number_of_chillers, max_chiller_size
 
 def calc_VCC_COP(config, load_types, centralized=True):
     """
