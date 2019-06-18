@@ -599,7 +599,7 @@ def main(config):
             annual_demand_disconnected_MWh += total_demand.ix[building_index, 'Qcs_sys_MWhyr']
         annual_demand_network_MWh = annual_demand_district_MWh - annual_demand_disconnected_MWh
         chiller_capacity_factor = (annual_demand_district_MWh*1000000) /(number_of_chillers*max_chiller_size*8760)
-        print 'chiller_capacity_factor', round (chiller_capacity_factor, 2)
+        print 'chiller_capacity_factor', round (chiller_capacity_factor, 4)
     else:
         raise ValueError('This optimization procedure is not ready for district heating yet!')
 
@@ -630,7 +630,7 @@ def main(config):
     cost_output['number_of_chillers'] = number_of_chillers
     cost_output['number_of_CT'] = number_of_CT
     cost_output['peak_demand_kWh']= round(plant_heat_peak_kW, 2)
-    cost_output['chiller_capacity_factor'] = round (chiller_capacity_factor, 2)
+    cost_output['chiller_capacity_factor'] = round (chiller_capacity_factor, 4)
     cost_output = pd.DataFrame.from_dict(cost_output, orient='index').T
     cost_output.to_csv(locator.get_optimization_network_layout_costs_file(config.thermal_network.network_type))
     return
