@@ -240,6 +240,15 @@ Thermal networks:
                'general:number-of-cpus-to-keep-free', 'thermal-network', 'thermal-network-optimization',
                'network-layout', 'general:detailed-electricity-pricing']
 
+- name: thermal-network-costs
+  label: Thermo network optimization
+  description: Calculate the CAPEX and OPEX of the networks
+  interfaces: [cli, arcgis, dashboard]
+  module: cea.technologies.thermal_network.thermal_network_costs
+  parameters: ['general:scenario', 'general:weather', 'general:multiprocessing',
+               'general:number-of-cpus-to-keep-free', 'thermal-network', 'thermal-network-optimization',
+               'network-layout', 'general:detailed-electricity-pricing']
+
 
 Utilities:
 
