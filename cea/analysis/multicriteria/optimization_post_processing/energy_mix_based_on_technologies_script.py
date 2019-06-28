@@ -45,16 +45,16 @@ def energy_mix_based_on_technologies_script(generation, individual, locator, net
 
         data_electricity = pd.read_csv(locator.get_optimization_slave_electricity_activation_pattern_cooling(individual, generation))
 
-        E_ACH_total_W = data_electricity['E_ACH_W'].sum()
-        E_CHP_to_directload_total_W = data_electricity['E_CHP_to_directload_W'].sum()
-        E_CHP_to_grid_total_W =  data_electricity['E_CHP_to_grid_W'].sum()
-        E_CT_total_W = data_electricity['E_CT_W'].sum()
-        E_PV_to_directload_total_W = data_electricity['E_PV_to_directload_W'].sum()
-        E_PV_to_grid_total_W = data_electricity['E_PV_to_grid_W'].sum()
-        E_VCC_total_W = data_electricity['E_VCC_W'].sum()
-        E_VCC_backup_total_W = data_electricity['E_VCC_backup_W'].sum()
-        E_hotwater_total_W = data_electricity['E_for_hot_water_demand_W'].sum()
-        E_from_grid_total_W = data_electricity['E_from_grid_W'].sum()
+        E_ACH_total_W = data_electricity['E_used_ACH_W'].sum()
+        E_CHP_to_directload_total_W = data_electricity['E_CHP_directload_W'].sum()
+        E_CHP_to_grid_total_W =  data_electricity['E_CHP_grid_W'].sum()
+        E_CT_total_W = data_electricity['E_used_CT_W'].sum()
+        E_PV_to_directload_total_W = data_electricity['E_PV_directload_W'].sum() #TODO: check PVT
+        E_PV_to_grid_total_W = data_electricity['E_PV_grid_W'].sum() #TODO: check PVT
+        E_VCC_total_W = data_electricity['E_used_VCC_W'].sum()
+        E_VCC_backup_total_W = data_electricity['E_used_VCC_backup_W'].sum()
+        E_hotwater_total_W = data_electricity['E_hotwater_total_W'].sum()
+        E_from_grid_total_W = data_electricity['E_GRID_directload_W'].sum()
         E_required_district_total_W = data_electricity['E_total_req_W'].sum()
         E_building_appliances_total_W = E_required_district_total_W - E_hotwater_total_W - E_VCC_backup_total_W - E_VCC_total_W - \
                                         E_CT_total_W - E_ACH_total_W
@@ -65,7 +65,7 @@ def energy_mix_based_on_technologies_script(generation, individual, locator, net
             data_natural_gas = pd.read_csv(
                 locator.get_optimization_slave_natural_gas_imports(individual, generation))
 
-        NG_used_total_W = data_natural_gas['NG_used_CCGT_W'].sum()
+        NG_used_total_W = data_natural_gas['NG_total_W'].sum()
 
 
         results = pd.DataFrame({"Q_VCC_total_MWhyr": [round(Q_VCC_total_W/1000000,2)],

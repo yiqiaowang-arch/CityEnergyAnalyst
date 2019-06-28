@@ -283,7 +283,7 @@ class Plots(object):
                 data_raw_df["Capex_Centralized_m2"] = 0.0
                 data_raw_df["Capex_Decentralized_m2"] = 0.0
             else:
-                area = (pd.read_csv(locator.get_costs_operation_file())[["GFA_m2"]]).sum(axis=0).values[0]
+                area = (pd.read_csv(locator.get_costs_operation_file())[["NFA_m2"]]).sum(axis=0).values[0]
                 data_individual = preprocessing_generations_data(locator, generation)
                 data_raw = processing_mcda_data(self.config, data_individual['generation'], generation, gen_pointer, individual,
                                                    ind_pointer, locator, self.network_type).iloc[0]
