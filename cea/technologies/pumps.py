@@ -182,8 +182,10 @@ def calc_Cinv_pump(deltaP, mdot_kgpers, eta_pumping, config, locator, technology
 
         InvC = Inv_a + Inv_b * (Pump_Array_W[pump_i]) ** Inv_c + (Inv_d + Inv_e * Pump_Array_W[pump_i]) * log(Pump_Array_W[pump_i])
 
-        Capex_a_pump_USD += InvC * (Inv_IR) * (1 + Inv_IR) ** Inv_LT / ((1 + Inv_IR) ** Inv_LT - 1)
-        Opex_fixed_pump_USD += Capex_a_pump_USD * Inv_OM
+        Capex_a1 = InvC * (Inv_IR) * (1 + Inv_IR) ** Inv_LT / ((1 + Inv_IR) ** Inv_LT - 1)
+        Capex_a_pump_USD = Capex_a_pump_USD + Capex_a1
+        Opex_fixed_pump_USD = Opex_fixed_pump_USD + Capex_a1 * Inv_OM
+        print Opex_fixed_pump_USD
         Capex_pump_USD += InvC
 
 

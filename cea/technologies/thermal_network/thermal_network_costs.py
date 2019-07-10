@@ -40,7 +40,7 @@ class Thermal_Network(object):
         self.network_name = config.thermal_network_optimization.network_names
         # initialize optimization storage variables and dictionaries
         self.cost_info = ['capex', 'opex', 'total', 'el_network_MWh',
-                          'opex_plant', 'opex_pump', 'opex_dis_loads', 'opex_dis_build', 'opex_hex',
+                          'opex_plant', 'opex_pump', 'opex_fixed_pump', 'opex_var_pump', 'opex_dis_loads', 'opex_dis_build', 'opex_hex',
                           'capex_chiller', 'capex_CT', 'capex_pump', 'capex_dis_loads', 'capex_dis_build', 'capex_hex',
                           'capex_network', 'network_length_m', 'avg_diam_m']
         self.generation_info = ['plant_buildings', 'number_of_plants', 'supplied_loads', 'disconnected_buildings',
@@ -533,6 +533,8 @@ def calc_Ctot_cs_district(network_info):
     cost_storage_df.ix['capex_chiller'][0] = Capex_a_chiller
     cost_storage_df.ix['capex_CT'][0] = Capex_a_CT
     cost_storage_df.ix['opex_plant'][0] = Opex_fixed_plant + Opex_var_plant
+    cost_storage_df.ix['opex_fixed_pump'][0] = Opex_fixed_pump
+    cost_storage_df.ix['opex_var_pump'][0] = Opex_var_pump
     cost_storage_df.ix['opex_pump'][0] = Opex_fixed_pump + Opex_var_pump
     cost_storage_df.ix['opex_hex'][0] = Opex_fixed_hex
     cost_storage_df.ix['opex_dis_loads'][0] = Opex_tot_dis_loads
@@ -540,7 +542,9 @@ def calc_Ctot_cs_district(network_info):
     cost_storage_df.ix['el_network_MWh'][0] = el_MWh
 
 
-    return Capex_a_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, demand_met_kWh, Opex_fixed_plant, Opex_var_plant,Opex_fixed_pump, Opex_var_pump, Opex_var_plant_qloss, Opex_var_plant_demand
+    return Capex_a_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, \
+           plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, \
+           demand_met_kWh, Opex_fixed_plant, Opex_var_plant, Opex_fixed_pump, Opex_var_pump, Opex_var_plant_qloss, Opex_var_plant_demand
 
 
 def find_cooling_systems_string(disconnected_systems):
@@ -666,8 +670,8 @@ def main(config):
     cost_output['cooling_demand_met_MWh'] = round(demand_met_kWh / 1000, 2)
     cost_output['opex_fixed_plant'] = round(Opex_fixed_plant, 2)
     cost_output['opex_var_plant'] = round(Opex_var_plant, 2)
-    cost_output['opex_fixed_pump'] = round(Opex_fixed_pump, 2)
-    cost_output['opex_var_pump'] = round(Opex_var_pump, 2)
+    cost_output['opex_fixed_pump'] = round(cost_storage_df.ix['opex_fixed_pump'][0], 2)
+    cost_output['opex_var_pump'] = round(cost_storage_df.ix['opex_var_pump'][0], 2)
     cost_output['capex_plant'] = round(cost_storage_df.ix['capex_chiller'][0]+cost_storage_df.ix['capex_CT'][0], 2)
     cost_output['opex_var_plant_qloss'] = round(Opex_var_plant_qloss, 2)
     cost_output['opex_var_plant_demand'] = round(Opex_var_plant_demand, 2)
