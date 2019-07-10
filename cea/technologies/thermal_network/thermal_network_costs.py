@@ -129,13 +129,31 @@ def calc_Ctot_cooling_plants(network_info):
     plant_heat_peak_kW_list = plant_heat_hourly_kWh.abs().max(axis=0).values  # calculate peak demand
     plant_heat_sum_kWh_list = plant_heat_hourly_kWh.abs().sum().values  # calculate aggregated demand
 
+    # read in thermal loss
+    qloss_kWh = pd.read_csv(
+        network_info.locator.get_thermal_network_qloss_system_file(
+            network_info.network_type, network_info.config.thermal_network_optimization.network_names))
+
+    qloss_original_kWh = qloss_kWh.copy()
+    qloss_sum_pipe_kWh = qloss_kWh.abs().sum(axis=0).values  # calculate aggregated thermal loss by pipe
+    qloss_sum_all_kWh = qloss_sum_pipe_kWh.transpose().sum()  # calculate aggregated themal loss for the entire pipe network
+
+    #print qloss_sum_pipe_kWh
+    print 'themral_loss_pipe: ', qloss_sum_all_kWh, '[kWh]'
+
+
     Opex_var_plant = 0.0
+    Opex_var_plant_qloss = 0.0
+    Opex_var_plant_demand = 0.0
     Opex_fixed_plant = 0.0
     Capex_a_chiller = 0.0
     Capex_a_CT = 0.0
     number_of_chillers = 0
     number_of_CT = 0
     max_chiller_size = 0.0
+    annual_plant_heat_production_kWh= 0.0
+    annual_thermal_loss_kWh= 0.0
+    demand_met_kWh = 0.0
 
     # calculate cost of chiller heat production and chiller capex and opex
     for plant_number in range(number_of_plants):  # iterate through all plants
@@ -145,6 +163,9 @@ def calc_Ctot_cooling_plants(network_info):
             plant_heat_peak_kW = plant_heat_peak_kW_list[0]
         plant_heat_yearly_kWh = plant_heat_sum_kWh_list[plant_number]
         print 'Annual plant heat production:', round(plant_heat_yearly_kWh, 0), '[kWh]'
+        annual_plant_heat_production_kWh = plant_heat_yearly_kWh
+        annual_thermal_loss_kWh = qloss_sum_all_kWh
+        demand_met_kWh = annual_plant_heat_production_kWh - qloss_sum_all_kWh  #actual cooling demand met (total production minus thermal loss along the network)
 
         # Read in building demand
         building_demand = {}
@@ -173,6 +194,14 @@ def calc_Ctot_cooling_plants(network_info):
                 COP_plant, COP_chiller = VCCModel.calc_VCC_COP(network_info.config, supplied_systems, centralized=True)
                 Opex_var_plant += abs(
                     plant_heat_yearly_kWh) / COP_plant * 1000 * network_info.prices.ELEC_PRICE
+                Opex_var_plant_qloss += abs(
+                    annual_thermal_loss_kWh) / COP_plant * 1000 * network_info.prices.ELEC_PRICE
+                Opex_var_plant_demand += abs(
+                    demand_met_kWh) / COP_plant * 1000 * network_info.prices.ELEC_PRICE
+
+                print 'COP_plant: ', COP_plant
+                print 'Elec_price: ', network_info.prices.ELEC_PRICE
+
             else:
                 print 'calculates operation costs with hourly simulation'
                 # calculates operation costs with hourly simulation
@@ -205,7 +234,7 @@ def calc_Ctot_cooling_plants(network_info):
         Capex_a_CT += Capex_a_CT_USD
         Opex_fixed_plant += Opex_fixed_chiller + Opex_fixed_CT
 
-    return Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size
+    return Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, demand_met_kWh, Opex_var_plant_qloss, Opex_var_plant_demand
 
 
 def calc_Ctot_cs_disconnected_loads(network_info):
@@ -464,7 +493,7 @@ def calc_Ctot_cs_district(network_info):
     # Network Pumps
     Capex_a_pump, Opex_fixed_pump, Opex_var_pump = calc_Ctot_network_pump(network_info)
     # Centralized plant
-    Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size = calc_Ctot_cooling_plants(network_info)
+    Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, demand_met_kWh, Opex_var_plant_qloss, Opex_var_plant_demand = calc_Ctot_cooling_plants(network_info)
     print 'number_of_chillers =', number_of_chillers
     print 'number_of_CT =', number_of_CT
     print 'plant_heat_peak_kWh =', round (plant_heat_peak_kW, 2), '[kWh]'
@@ -492,6 +521,7 @@ def calc_Ctot_cs_district(network_info):
     Costs_total = Capex_a_netw + Capex_a_pump + Capex_a_chiller + Capex_a_CT + Capex_a_hex + \
                   Opex_fixed_pump + Opex_var_pump + Opex_var_plant + Ctot_dis_loads + Ctot_dis_buildings + \
                   Opex_fixed_plant + Opex_fixed_hex
+
     cost_storage_df.ix['total'][0] = Capex_a_total + Opex_total
     cost_storage_df.ix['opex'][0] = Opex_total
     cost_storage_df.ix['capex'][0] = Capex_a_total
@@ -510,7 +540,7 @@ def calc_Ctot_cs_district(network_info):
     cost_storage_df.ix['el_network_MWh'][0] = el_MWh
 
 
-    return Capex_a_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size
+    return Capex_a_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, demand_met_kWh, Opex_fixed_plant, Opex_var_plant,Opex_fixed_pump, Opex_var_pump, Opex_var_plant_qloss, Opex_var_plant_demand
 
 
 def find_cooling_systems_string(disconnected_systems):
@@ -586,7 +616,7 @@ def main(config):
         raise ValueError('Disconnected buildings are specified in cea.config, please remove it! (see NOTE above)')
 
     # calculate total network costs
-    Capex_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size = calc_Ctot_cs_district(network_info)
+    Capex_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, demand_met_kWh, Opex_fixed_plant, Opex_var_plant,Opex_fixed_pump, Opex_var_pump, Opex_var_plant_qloss, Opex_var_plant_demand = calc_Ctot_cs_district(network_info)
 
     # calculate network total length and average diameter
     length_m, average_diameter_m = calc_network_size(network_info)
@@ -609,9 +639,9 @@ def main(config):
     cost_output['total_annual_cost'] = round(cost_storage_df.ix['total'][0], 2)
     cost_output['annual_opex'] = round(cost_storage_df.ix['opex'][0], 2)
     cost_output['annual_capex'] = round(cost_storage_df.ix['capex'][0], 2)
-    cost_output['total_cost_per_MWh'] = round(cost_output['total_annual_cost'] / annual_demand_district_MWh, 2)
-    cost_output['opex_per_MWh'] = round(cost_output['annual_opex'] / annual_demand_district_MWh, 2)
-    cost_output['capex_per_MWh'] = round(cost_output['annual_capex'] / annual_demand_district_MWh, 2)
+    cost_output['total_cost_per_MWh'] = round(cost_output['total_annual_cost'] / (demand_met_kWh / 1000), 2)
+    cost_output['opex_per_MWh'] = round(cost_output['annual_opex'] /(demand_met_kWh / 1000), 2)
+    cost_output['capex_per_MWh'] = round(cost_output['annual_capex'] /(demand_met_kWh / 1000), 2)
     cost_output['annual_demand_district_MWh'] = round(annual_demand_district_MWh, 2)
     cost_output['annual_demand_disconnected_MWh'] = round(annual_demand_disconnected_MWh, 2)
     cost_output['annual_demand_network_MWh'] = round(annual_demand_network_MWh, 2)
@@ -631,6 +661,16 @@ def main(config):
     cost_output['number_of_CT'] = number_of_CT
     cost_output['peak_demand_kWh']= round(plant_heat_peak_kW, 2)
     cost_output['chiller_capacity_factor'] = round (chiller_capacity_factor, 4)
+    cost_output['annual_plant_heat_production_MWh'] = round(annual_plant_heat_production_kWh/1000, 2)
+    cost_output['annual_thermal_loss_kWh_MWh'] = round(annual_thermal_loss_kWh / 1000, 2)
+    cost_output['cooling_demand_met_MWh'] = round(demand_met_kWh / 1000, 2)
+    cost_output['opex_fixed_plant'] = round(Opex_fixed_plant, 2)
+    cost_output['opex_var_plant'] = round(Opex_var_plant, 2)
+    cost_output['opex_fixed_pump'] = round(Opex_fixed_pump, 2)
+    cost_output['opex_var_pump'] = round(Opex_var_pump, 2)
+    cost_output['capex_plant'] = round(cost_storage_df.ix['capex_chiller'][0]+cost_storage_df.ix['capex_CT'][0], 2)
+    cost_output['opex_var_plant_qloss'] = round(Opex_var_plant_qloss, 2)
+    cost_output['opex_var_plant_demand'] = round(Opex_var_plant_demand, 2)
     cost_output = pd.DataFrame.from_dict(cost_output, orient='index').T
     cost_output.to_csv(locator.get_optimization_network_layout_costs_file(config.thermal_network.network_type))
     return
