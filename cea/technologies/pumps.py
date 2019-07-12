@@ -128,6 +128,7 @@ def calc_Cinv_pump(deltaP, mdot_kgpers, eta_pumping, config, locator, technology
 
     E_pumping_required_W = mdot_kgpers * deltaP / DENSITY_OF_WATER_AT_60_DEGREES_KGPERM3
     P_motor_tot_W = E_pumping_required_W / eta_pumping  # electricty to run the motor
+    E_Pumps_kW = P_motor_tot_W/1000
 
     x = [0.4999, 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 220,
          260, 315, 335, 375]  # Nominal load in kW
@@ -141,6 +142,10 @@ def calc_Cinv_pump(deltaP, mdot_kgpers, eta_pumping, config, locator, technology
     InvC_mot = interp1d(x, y, kind='cubic')
     InvC_VFC = interp1d(x1, y1, kind='cubic')
 
+    Capex_a_pump_USD = 0.0
+    Opex_fixed_pump_USD = 0.0
+    Capex_pump_USD = 0.0
+
     Pump_max_kW = 375.0
     Pump_min_kW = 0.5
     nPumps = int(np.ceil(P_motor_tot_W / 1000.0 / Pump_max_kW))
@@ -151,9 +156,7 @@ def calc_Cinv_pump(deltaP, mdot_kgpers, eta_pumping, config, locator, technology
     # if PpumpRemain < PpumpMinkW * 1000:
     #   PpumpRemain = PpumpMinkW * 1000
 
-    Capex_a_pump_USD = 0.0
-    Opex_fixed_pump_USD = 0.0
-    Capex_pump_USD = 0.0
+
 
     for pump_i in range(nPumps):
         # calculate pump nominal capacity
@@ -185,10 +188,10 @@ def calc_Cinv_pump(deltaP, mdot_kgpers, eta_pumping, config, locator, technology
         Capex_a1 = InvC * (Inv_IR) * (1 + Inv_IR) ** Inv_LT / ((1 + Inv_IR) ** Inv_LT - 1)
         Capex_a_pump_USD = Capex_a_pump_USD + Capex_a1
         Opex_fixed_pump_USD = Opex_fixed_pump_USD + Capex_a1 * Inv_OM
-        print Opex_fixed_pump_USD
+        #print Opex_fixed_pump_USD
         Capex_pump_USD += InvC
 
 
-    return Capex_a_pump_USD, Opex_fixed_pump_USD, Capex_pump_USD
+    return Capex_a_pump_USD, Opex_fixed_pump_USD, Capex_pump_USD, nPumps, E_Pumps_kW
 
 

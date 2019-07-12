@@ -93,6 +93,7 @@ def calc_Ctot_network_pump(network_info):
     mdotA_kgpers = np.array(df)
     mdotA_kgpers = np.nan_to_num(mdotA_kgpers)
     mdotnMax_kgpers = np.amax(mdotA_kgpers)  # find highest mass flow of all nodes at all timesteps (should be at plant)
+    highest_mass_flow = mdotnMax_kgpers
     # read in total pressure loss in kW
     deltaP_kW = pd.read_csv(network_info.locator.get_thermal_network_layout_pressure_drop_kw_file(network_type,''))
     deltaP_kW = deltaP_kW['pressure_loss_total_kW'].sum()
@@ -104,10 +105,10 @@ def calc_Ctot_network_pump(network_info):
     else:
         deltaPmax = np.max(network_info.network_features.DeltaP_DCN)
 
-    Capex_a, Opex_a_fixed, Capex_total = pumps.calc_Cinv_pump(deltaPmax, mdotnMax_kgpers, PUMP_ETA, network_info.config,
+    Capex_a, Opex_a_fixed, Capex_total, number_of_pumps, E_Pumps_kW = pumps.calc_Cinv_pump(deltaPmax, mdotnMax_kgpers, PUMP_ETA, network_info.config,
                                                network_info.locator, 'PU1')  # investment of Machinery
 
-    return Capex_a, Opex_a_fixed, Opex_var
+    return Capex_a, Opex_a_fixed, Opex_var, number_of_pumps, E_Pumps_kW, highest_mass_flow
 
 
 def calc_Ctot_cooling_plants(network_info):
@@ -491,7 +492,7 @@ def calc_Ctot_cs_district(network_info):
     # Network pipes
     Capex_a_netw = calc_Capex_a_network_pipes(network_info)
     # Network Pumps
-    Capex_a_pump, Opex_fixed_pump, Opex_var_pump = calc_Ctot_network_pump(network_info)
+    Capex_a_pump, Opex_fixed_pump, Opex_var_pump, number_of_pumps, E_Pumps_kW, highest_mass_flow = calc_Ctot_network_pump(network_info)
     # Centralized plant
     Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, demand_met_kWh, Opex_var_plant_qloss, Opex_var_plant_demand = calc_Ctot_cooling_plants(network_info)
     print 'number_of_chillers =', number_of_chillers
@@ -544,7 +545,7 @@ def calc_Ctot_cs_district(network_info):
 
     return Capex_a_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, \
            plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, \
-           demand_met_kWh, Opex_fixed_plant, Opex_var_plant, Opex_fixed_pump, Opex_var_pump, Opex_var_plant_qloss, Opex_var_plant_demand
+           demand_met_kWh, Opex_fixed_plant, Opex_var_plant, Opex_fixed_pump, Opex_var_pump, Opex_var_plant_qloss, Opex_var_plant_demand, number_of_pumps, E_Pumps_kW, highest_mass_flow
 
 
 def find_cooling_systems_string(disconnected_systems):
@@ -620,7 +621,7 @@ def main(config):
         raise ValueError('Disconnected buildings are specified in cea.config, please remove it! (see NOTE above)')
 
     # calculate total network costs
-    Capex_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, demand_met_kWh, Opex_fixed_plant, Opex_var_plant,Opex_fixed_pump, Opex_var_pump, Opex_var_plant_qloss, Opex_var_plant_demand = calc_Ctot_cs_district(network_info)
+    Capex_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers, number_of_CT, plant_heat_peak_kW, max_chiller_size, annual_plant_heat_production_kWh, annual_thermal_loss_kWh, demand_met_kWh, Opex_fixed_plant, Opex_var_plant,Opex_fixed_pump, Opex_var_pump, Opex_var_plant_qloss, Opex_var_plant_demand, number_of_pumps, E_Pumps_kW, highest_mass_flow = calc_Ctot_cs_district(network_info)
 
     # calculate network total length and average diameter
     length_m, average_diameter_m = calc_network_size(network_info)
@@ -675,6 +676,9 @@ def main(config):
     cost_output['capex_plant'] = round(cost_storage_df.ix['capex_chiller'][0]+cost_storage_df.ix['capex_CT'][0], 2)
     cost_output['opex_var_plant_qloss'] = round(Opex_var_plant_qloss, 2)
     cost_output['opex_var_plant_demand'] = round(Opex_var_plant_demand, 2)
+    cost_output['number_of_pumps'] = round(number_of_pumps, 2)
+    cost_output['el_Pumps_kW'] = round(E_Pumps_kW, 2)
+    cost_output['highest_mass_flow_kg_per_second'] = round(highest_mass_flow, 2)
     cost_output = pd.DataFrame.from_dict(cost_output, orient='index').T
     cost_output.to_csv(locator.get_optimization_network_layout_costs_file(config.thermal_network.network_type))
     return
