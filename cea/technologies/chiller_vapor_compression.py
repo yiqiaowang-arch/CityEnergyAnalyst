@@ -157,7 +157,7 @@ def calc_Cinv_VCC(qcold_W, locator, config, technology_type):
                 Opex_fixed_VCC_USD = Opex_fixed_VCC_USD + Capex_a1 * Inv_OM
                 Capex_VCC_USD = Capex_VCC_USD + InvC
 
-    return Capex_a_VCC_USD, Opex_fixed_VCC_USD, Capex_VCC_USD, number_of_chillers, max_chiller_size
+    return Capex_a_VCC_USD, Opex_fixed_VCC_USD, Capex_VCC_USD, number_of_chillers, Q_nom_each_chiller
 
 def calc_VCC_COP(config, load_types, centralized=True):
     """
