@@ -2846,9 +2846,6 @@ get_lca_operation:
     GFA_m2:
       sample_data: 48914.39
       types_found: [float]
-    GFA_m2.1:
-      sample_data: 48914.39
-      types_found: [float]
     GRID_ghg_kgm2:
       sample_data: 85.63
       types_found: [float]
@@ -2886,9 +2883,6 @@ get_lca_operation:
       sample_data: 0.0
       types_found: [float]
     Name:
-      sample_data: B010
-      types_found: [string]
-    Name.1:
       sample_data: B010
       types_found: [string]
     OIL_hs_ghg_kgm2:
@@ -2930,25 +2924,13 @@ get_lca_operation:
     PV_ghg_kgm2:
       sample_data: 0.0
       types_found: [float]
-    PV_ghg_kgm2.1:
-      sample_data: 0.0
-      types_found: [float]
     PV_ghg_ton:
-      sample_data: 0.0
-      types_found: [float]
-    PV_ghg_ton.1:
       sample_data: 0.0
       types_found: [float]
     PV_nre_pen_GJ:
       sample_data: 0.0
       types_found: [float]
-    PV_nre_pen_GJ.1:
-      sample_data: 0.0
-      types_found: [float]
     PV_nre_pen_MJm2:
-      sample_data: 0.0
-      types_found: [float]
-    PV_nre_pen_MJm2.1:
       sample_data: 0.0
       types_found: [float]
     SOLAR_hs_ghg_kgm2:
