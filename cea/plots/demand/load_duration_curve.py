@@ -31,8 +31,8 @@ class LoadDurationCurvePlot(cea.plots.demand.DemandPlotBase):
 
     @property
     def layout(self):
-        return go.Layout(xaxis=dict(title='Duration Normalized [%]', domain=[0, 1]),
-                         yaxis=dict(title='Load [kW]', domain=[0.0, 0.7]), showlegend=True)
+        return go.Layout(xaxis=dict(title='Duration Normalized [%]'),
+                         yaxis=dict(title='Load [kW]'), showlegend=True)
 
     def calc_graph(self):
         graph = []
@@ -147,11 +147,14 @@ if __name__ == '__main__':
     # cache = cea.plots.cache.NullPlotCache()
 
     LoadDurationCurvePlot(config.project, {'buildings': None,
-                                           'scenario-name': config.scenario_name},
+                                           'scenario-name': config.scenario_name,
+                                           'timeframe': config.plots.timeframe},
                           cache).plot(auto_open=True)
     LoadDurationCurvePlot(config.project, {'buildings': locator.get_zone_building_names()[0:2],
-                                           'scenario-name': config.scenario_name},
+                                           'scenario-name': config.scenario_name,
+                                           'timeframe': config.plots.timeframe},
                           cache).plot(auto_open=True)
     LoadDurationCurvePlot(config.project, {'buildings': [locator.get_zone_building_names()[0]],
-                                           'scenario-name': config.scenario_name},
+                                           'scenario-name': config.scenario_name,
+                                           'timeframe': config.plots.timeframe},
                           cache).plot(auto_open=True)

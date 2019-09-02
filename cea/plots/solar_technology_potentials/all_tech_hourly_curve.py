@@ -34,16 +34,7 @@ class AllTechHourlyPlot(cea.plots.solar_technology_potentials.SolarTechnologyPot
 
     @property
     def layout(self):
-        return dict(title=self.title, yaxis=dict(title='Hourly production [kWh]'),
-                  xaxis=dict(rangeselector=dict(buttons=list([
-                      dict(count=1, label='1d', step='day', stepmode='backward'),
-                      dict(count=1, label='1w', step='week', stepmode='backward'),
-                      dict(count=1, label='1m', step='month', stepmode='backward'),
-                      dict(count=6, label='6m', step='month', stepmode='backward'),
-                      dict(count=1, label='1y', step='year', stepmode='backward'),
-                      dict(step='all')])), rangeslider=dict(), type='date', range=[self.data_frame.index[0],
-                                                                                   self.data_frame.index[168]],
-                      fixedrange=False))
+        return dict(yaxis=dict(title='Hourly production [kWh]'))
 
     def missing_input_files(self):
         """Overriding the base version of this method, since for this plot, having at least one technology
@@ -121,17 +112,18 @@ def main():
     locator = cea.inputlocator.InputLocator(config.scenario)
     cache = cea.plots.cache.PlotCache(config.project)
     # cache = cea.plots.cache.NullPlotCache()
+    weather_path = locator.get_weather_file()
     AllTechHourlyPlot(config.project, {'buildings': None,
                                        'scenario-name': config.scenario_name,
-                                       'weather': config.weather},
+                                       'weather': weather_path},
                       cache).plot(auto_open=True)
     AllTechHourlyPlot(config.project, {'buildings': locator.get_zone_building_names()[0:2],
                                        'scenario-name': config.scenario_name,
-                                       'weather': config.weather},
+                                       'weather': weather_path},
                       cache).plot(auto_open=True)
     AllTechHourlyPlot(config.project, {'buildings': [locator.get_zone_building_names()[0]],
                                        'scenario-name': config.scenario_name,
-                                       'weather': config.weather},
+                                       'weather': weather_path},
                       cache).plot(auto_open=True)
 
 

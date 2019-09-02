@@ -49,7 +49,8 @@ def Pump_operation(P_design):
     return eta_pumping, eta_pump_fluid, eta_motor
 
 
-def calc_Ctot_pump(master_to_slave_vars, network_features, locator, lca, network_type):
+def calc_Ctot_pump(master_to_slave_vars, network_features, locator, lca, network_type
+                   ):
     """
     Computes the total pump investment cost
     :type master_to_slave_vars : class context
@@ -65,11 +66,10 @@ def calc_Ctot_pump(master_to_slave_vars, network_features, locator, lca, network
     P_motor_tot_W = np.zeros(8760)
     if network_type == "DH":
 
-        df = pd.read_csv(locator.get_thermal_network_data_folder(master_to_slave_vars.network_data_file_heating), usecols=["mdot_DH_netw_total_kgpers"])
+        df = pd.read_csv(locator.get_optimization_thermal_network_data_file(master_to_slave_vars.network_data_file_heating), usecols=["mdot_DH_netw_total_kgpers"])
         mdotA_kgpers = np.array(df)
         mdotnMax_kgpers = np.amax(mdotA_kgpers)
 
-        # mdot0Max = np.amax( np.array( pd.read_csv("Network_summary_result_all.csv", usecols=["mdot_heat_netw_total"]) ) )
 
         for i in range(int(np.shape(mdotA_kgpers)[0])):
             deltaP = 2 * (104.81 * mdotA_kgpers[i][0] + 59016)
@@ -83,10 +83,10 @@ def calc_Ctot_pump(master_to_slave_vars, network_features, locator, lca, network
     if network_type == "DC":
 
         if master_to_slave_vars.WasteServersHeatRecovery == 1:
-            df = pd.read_csv(locator.get_thermal_network_data_folder(master_to_slave_vars.network_data_file_heating),
+            df = pd.read_csv(locator.get_optimization_thermal_network_data_file(master_to_slave_vars.network_data_file_cooling),
                              usecols=["mdot_cool_space_cooling_and_refrigeration_netw_all_kgpers"])
         else:
-            df = pd.read_csv(locator.get_thermal_network_data_folder(master_to_slave_vars.network_data_file_heating),
+            df = pd.read_csv(locator.get_optimization_thermal_network_data_file(master_to_slave_vars.network_data_file_cooling),
                              usecols=["mdot_cool_space_cooling_data_center_and_refrigeration_netw_all_kgpers"])
 
         mdotA_kgpers = np.array(df)

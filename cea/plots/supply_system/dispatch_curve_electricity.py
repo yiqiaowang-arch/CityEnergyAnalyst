@@ -26,25 +26,28 @@ class DispatchCurveDistrictElectricityPlot(cea.plots.supply_system.SupplySystemP
     def __init__(self, project, parameters, cache):
         super(DispatchCurveDistrictElectricityPlot, self).__init__(project, parameters, cache)
         self.analysis_fields = ["E_CHP_gen_directload_W",
-                                "E_CCGT_gen_directload_W",
-                                "E_Furnace_gen_directload_W",
+                                "E_Trigen_gen_directload_W",
+                                "E_Furnace_dry_gen_directload_W",
+                                "E_Furnace_wet_gen_directload_W",
                                 "E_PV_gen_directload_W",
                                 "E_PVT_gen_directload_W",
                                 "E_GRID_directload_W",
                                 ]
         self.analysis_fields_exports = ["E_CHP_gen_export_W",
-                                        "E_CCGT_gen_export_W",
-                                        "E_Furnace_gen_export_W",
+                                        "E_Trigen_gen_export_W",
+                                        "E_Furnace_dry_gen_export_W",
+                                        "E_Furnace_wet_gen_export_W",
                                         "E_PV_gen_export_W",
                                         "E_PVT_gen_export_W",
                                         ]
         self.analysis_field_demand = ['E_electricalnetwork_sys_req_W']
-        self.input_files = [(self.locator.get_optimization_slave_heating_activation_pattern,
+        self.timeframe = self.parameters['timeframe']
+        self.input_files = [(self.locator.get_optimization_slave_electricity_activation_pattern,
                              [self.individual, self.generation])]
 
     @property
     def title(self):
-        return "Dispatch curve for electricity network Option {individual}".format(individual=self.individual)
+        return "Dispatch curve for electricity system #%s (%s)" % (self.individual, self.timeframe)
 
     @property
     def output_path(self):
@@ -55,9 +58,7 @@ class DispatchCurveDistrictElectricityPlot(cea.plots.supply_system.SupplySystemP
 
     @property
     def layout(self):
-        data_frame = self.process_individual_dispatch_curve_electricity()
-        return dict(barmode='relative', yaxis=dict(title='Energy Generation [kW]'),
-                    xaxis=dict(type='date', range=[data_frame.index[0], data_frame.index[168]], fixedrange=False))
+        return dict(barmode='relative', yaxis=dict(title='Energy Generation [MWh]'))
 
     def calc_graph(self):
         # main data about technologies
@@ -65,14 +66,15 @@ class DispatchCurveDistrictElectricityPlot(cea.plots.supply_system.SupplySystemP
         graph = []
         analysis_fields = self.remove_unused_fields(data, self.analysis_fields)
         for field in analysis_fields:
-            y = (data[field].values) / 1000  # into kW
+            y = (data[field].values) / 1E6  # into MWh
             trace = go.Bar(x=data.index, y=y, name=NAMING[field],
                            marker=dict(color=COLOR[field]))
             graph.append(trace)
 
         # data about demand
+        data_req = self.process_individual_requirements_curve_electricity()
         for field in self.analysis_field_demand:
-            y = (data[field].values) / 1000  # into kW
+            y = (data_req[field].values) / 1E6 # into MWh
             trace = go.Scatter(x=data.index, y=y, name=NAMING[field],
                                line=dict(width=1, color=COLOR[field]))
 
@@ -81,7 +83,7 @@ class DispatchCurveDistrictElectricityPlot(cea.plots.supply_system.SupplySystemP
         # data about exports
         analysis_fields_exports = self.remove_unused_fields(data, self.analysis_fields_exports)
         for field in analysis_fields_exports:
-            y = (data[field].values) / 1000  # into kW
+            y = (data[field].values) / 1E6  # into MWh
             trace = go.Bar(x=data.index, y=y, name=NAMING[field],
                            marker=dict(color=COLOR[field]))
 
@@ -99,7 +101,8 @@ def main():
     DispatchCurveDistrictElectricityPlot(config.project,
                                          {'scenario-name': config.scenario_name,
                                           'generation': config.plots_supply_system.generation,
-                                          'individual': config.plots_supply_system.individual},
+                                          'individual': config.plots_supply_system.individual,
+                                          'timeframe': config.plots_supply_system.timeframe},
                                          cache).plot(auto_open=True)
 
 
