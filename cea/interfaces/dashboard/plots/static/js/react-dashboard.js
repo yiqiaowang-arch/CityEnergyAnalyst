@@ -965,7 +965,11 @@ const PlotLegendToggle = ({ divID }) => {
       <Icon
         type="unordered-list"
         onClick={toggleLegends}
-        style={{ color: showLegend ? "#1890ff" : "grey", margin: "0 5px" }}
+        style={{
+          color: showLegend ? "#1890ff" : "#ff0000",
+          margin: "0 5px",
+          fontSize: "17px"
+        }}
       />
     </Tooltip>
   );
@@ -1001,7 +1005,11 @@ const EditMenu = React.memo(({ dashIndex, index }) => {
   return (
     <React.Fragment>
       <Dropdown overlay={menu} trigger={["click"]}>
-        <Icon type="edit" theme="twoTone" style={{ margin: "0 5px" }} />
+        <Icon
+          type="edit"
+          theme="twoTone"
+          style={{ margin: "0 5px", fontSize: "17px" }}
+        />
       </Dropdown>
     </React.Fragment>
   );
