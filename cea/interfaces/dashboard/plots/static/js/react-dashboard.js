@@ -919,7 +919,16 @@ const Plot = ({ index, dashIndex, data, style }) => {
     <Card
       title={
         <div>
-          <span style={{ fontWeight: "bold" }}>{data.title}</span>
+          <span
+            style={{ fontWeight: "bold" }}
+            title={`${data.title}${
+              data.parameters["scenario-name"]
+                ? " - " + data.parameters["scenario-name"]
+                : ""
+            }`}
+          >
+            {data.title}
+          </span>
           {data.parameters["scenario-name"] && (
             <React.Fragment>
               <span> - </span>
