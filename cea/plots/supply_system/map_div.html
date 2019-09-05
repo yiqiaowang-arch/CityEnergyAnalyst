@@ -213,8 +213,8 @@
                 let div = document.createElement("div");
                 div.innerText = "No networks found.";
                 document.getElementById(`network-radios-${ hash }`).appendChild(div);
-                document.getElementById(`network-${ hash }-label`).remove();
-                document.getElementById(`connected-${ hash }-label`).remove();
+                document.getElementById(`network-${ hash }-label`).parentElement.remove();
+                document.getElementById(`connected-${ hash }-label`).parentElement.remove();
             }
 
             // Register onchange for layer toggles
