@@ -43,10 +43,10 @@ def schedule_maker_main(locator, config, building=None):
     else:
         raise ValueError("Invalid schedule model: {schedule_model}".format(**locals()))
 
-    if buildings == []:
+    if not buildings:
         buildings = locator.get_zone_building_names()
-    if building !=None:
-        buildings = [building] #this is to run the tests
+    if not building is None:
+        buildings = [building]  # this is to run the tests
 
     # get variables of indoor comfort and internal loads
     internal_loads = dbf_to_dataframe(locator.get_building_internal()).set_index('Name')
