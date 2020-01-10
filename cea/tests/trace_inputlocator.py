@@ -49,9 +49,8 @@ def main(config):
     config.multiprocessing = False
     locator = cea.inputlocator.InputLocator(config.scenario)
 
-
     trace_data = set()  # set used for graphviz output -> {(direction, script, locator_method, path, file)}
-    building_specific_files = [] # list containing all building specific files e.g. B01.csv or B07_insolation.dbf
+    building_specific_files = []  # list containing all building specific files e.g. B01.csv or B07_insolation.dbf
 
 
     for script_name in config.trace_inputlocator.scripts:
