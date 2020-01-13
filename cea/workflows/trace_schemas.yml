@@ -14,7 +14,7 @@
 - script: weather-helper
   parameters:
     weather: Zug-inducity_1990_2010_TMY
-- script: radiation
+# - script: radiation
 - script: schedule-maker
 - script: demand
 - script: emissions
