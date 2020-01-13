@@ -10,6 +10,7 @@ from datetime import datetime
 from jinja2 import Template
 import cea.inputlocator
 import pandas
+import pandas.errors
 import yaml
 from dateutil.parser import parse
 
@@ -128,6 +129,7 @@ def meta_to_yaml(config, trace_data, meta_output_file):
             locator_meta[locator_method] = {}
             locator_meta[locator_method]['created_by'] = []
             locator_meta[locator_method]['used_by'] = []
+            print("Getting schema for {file_full_path}".format(file_full_path=file_full_path))
             locator_meta[locator_method]['schema'] = schema['%s' % file_type](file_full_path)
             locator_meta[locator_method]['file_path'] = file_full_path
             locator_meta[locator_method]['file_type'] = file_type
@@ -251,7 +253,11 @@ def get_tif_schema(filename):
 
 
 def get_csv_schema(filename):
-    db = pandas.read_csv(filename)
+    try:
+        db = pandas.read_csv(filename)
+    except pandas.errors.EmptyDataError:
+        # csv file is empty
+        return None
     schema = {}
     for attr in db:
         attr = replace_repetitive_attr(attr)
