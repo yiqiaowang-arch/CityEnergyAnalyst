@@ -11,7 +11,7 @@
 - script: data-initializer
   parameters:
     region: CH
-    databases: [archetypes, lifecycle, systems]
+    databases: [archetypes, assemblies, components]
 - script: archetypes-mapper
   parameters:
     input-databases: [comfort, architecture, air-conditioning, internal-loads, supply, schedules, emission-intensity]
