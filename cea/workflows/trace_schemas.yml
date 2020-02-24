@@ -8,9 +8,13 @@
     case: open
 - config: .
   "general:scenario-name": baseline
-- script: data-helper
+- script: data-initializer
   parameters:
     region: CH
+    databases: [archetypes, lifecycle, systems]
+- script: archetypes-mapper
+  parameters:
+    input-databases: [comfort, architecture, air-conditioning, internal-loads, supply, schedules, emission-intensity]
 - script: weather-helper
   parameters:
     weather: Zug-inducity_1990_2010_TMY
@@ -48,14 +52,13 @@
 - script: decentralized
   parameters:
     detailed-electricity-pricing: false
-- script: optimization
-  parameters:
-    district-heating-network: true
-    district-cooling-network: false
-    detailed-electricity-pricing: false
-    number-of-generations: 2
-    population-size: 5
-    random-seed: 100
+- - script: optimization
+    parameters:
+      district-heating-network: true
+      district-cooling-network: false
+      number-of-generations: 2
+      population-size: 5
+      random-seed: 100
 - script: multi-criteria-analysis
   parameters:
     generation: 2
