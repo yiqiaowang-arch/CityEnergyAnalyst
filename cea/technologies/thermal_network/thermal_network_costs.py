@@ -151,6 +151,8 @@ def calc_Ctot_cooling_plants(network_info):
     Opex_fixed_plant = 0.0
     Capex_a_chiller = 0.0
     Capex_a_CT = 0.0
+    number_of_chillers = 0.0
+    max_chiller_size = 0.0
 
 
     # calculate cost of chiller heat production and chiller capex and opex
@@ -209,14 +211,14 @@ def calc_Ctot_cooling_plants(network_info):
 
             # calculate equipment cost of chiller and cooling tower
 
-            Capex_a_chiller_USD, Opex_fixed_chiller, _ = VCCModel.calc_Cinv_VCC(peak_demand_W, network_info.locator, 'CH1')
+            Capex_a_chiller_USD, Opex_fixed_chiller, _, number_of_chillers,  max_chiller_size = VCCModel.calc_Cinv_VCC(peak_demand_W, network_info.locator, 'CH1')
             Capex_a_CT_USD, Opex_fixed_CT, _ = CTModel.calc_Cinv_CT(peak_demand_W, network_info.locator, 'CT1')
         # sum over all plants
         Capex_a_chiller += Capex_a_chiller_USD
         Capex_a_CT += Capex_a_CT_USD
         Opex_fixed_plant += Opex_fixed_chiller + Opex_fixed_CT
 
-    return Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT
+    return Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT, plant_heat_hourly_kWh, number_of_chillers,  max_chiller_size, plant_heat_yearly_kWh
 
 
 def calc_Ctot_cs_building_scale_loads(network_info):
@@ -302,7 +304,7 @@ def calc_Ctot_cs_building_scale_loads(network_info):
                         Q_peak_CT_kW = max(Q_CT_kW)
 
                     # calculate disconnected systems cost of disconnected loads. Assumes that all these loads are supplied by one chiller, unless this exceeds maximum chiller capacity of database
-                    Capex_a_chiller_USD, Opex_fixed_chiller, _ = VCCModel.calc_Cinv_VCC(peak_demand_kW * 1000, network_info.locator, 'CH3')
+                    Capex_a_chiller_USD, Opex_fixed_chiller, _, _, _ = VCCModel.calc_Cinv_VCC(peak_demand_kW * 1000, network_info.locator, 'CH3')
                     Capex_a_CT_USD, Opex_fixed_CT, _ = CTModel.calc_Cinv_CT(Q_peak_CT_kW * 1000, network_info.locator,
                                                                             'CT1')
                     # sum up costs
@@ -471,7 +473,7 @@ def calc_Ctot_cs_district(network_info):
     # Network Pumps
     Capex_a_pump, Opex_fixed_pump, Opex_var_pump = calc_Ctot_network_pump(network_info)
     # Centralized plant
-    Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT = calc_Ctot_cooling_plants(network_info)
+    Opex_fixed_plant, Opex_var_plant, Capex_a_chiller, Capex_a_CT, plant_heat_hourly_kWh, number_of_chillers,  max_chiller_size , plant_heat_yearly_kWh = calc_Ctot_cooling_plants(network_info)
     if Opex_var_plant < 1:
         # no heat supplied by centralized plant/network, this makes sure that the network cost is 0.
         Capex_a_netw = 0
@@ -512,7 +514,7 @@ def calc_Ctot_cs_district(network_info):
     cost_storage_df.loc['opex_dis_build'][0] = Opex_tot_dis_buildings
     cost_storage_df.loc['el_network_MWh'][0] = el_MWh
 
-    return Capex_a_total, Opex_total, Costs_total, cost_storage_df
+    return Capex_a_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers,  max_chiller_size, plant_heat_yearly_kWh
 
 
 def find_cooling_systems_string(disconnected_systems):
@@ -586,7 +588,7 @@ def main(config):
         raise ValueError('Disconnected buildings are specified in cea.config, please remove it! (see NOTE above)')
 
     # calculate total network costs
-    Capex_total, Opex_total, Costs_total, cost_storage_df = calc_Ctot_cs_district(network_info)
+    Capex_total, Opex_total, Costs_total, cost_storage_df, number_of_chillers,  max_chiller_size, plant_heat_yearly_kWh = calc_Ctot_cs_district(network_info)
 
     # calculate network total length and average diameter
     length_m, average_diameter_m = calc_network_size(network_info)
@@ -600,8 +602,11 @@ def main(config):
         for building_index in disconnected_buildings_index:
             annual_demand_disconnected_MWh += total_demand.ix[building_index, 'Qcs_sys_MWhyr']
         annual_demand_network_MWh = annual_demand_district_MWh - annual_demand_disconnected_MWh
-        chiller_capacity_factor = (demand_met_kWh*1000) /(number_of_chillers*max_chiller_size*8760)
-        print('chiller_capacity_factor', round (chiller_capacity_factor, 4))
+        chiller_capacity_factor = (plant_heat_yearly_kWh)*1000 /(number_of_chillers*max_chiller_size*8760)
+        print('chiller_capacity_factor', chiller_capacity_factor)
+        print('plant_heat_yearly_kWh', plant_heat_yearly_kWh)
+        print('number_of_chillers', number_of_chillers)
+        print('max_chiller_size', max_chiller_size)
 
     else:
         raise ValueError('This optimization procedure is not ready for district heating yet!')
@@ -615,7 +620,6 @@ def main(config):
     cost_output['opex_per_MWh'] = round(cost_output['annual_opex'] / annual_demand_district_MWh, 2)
     cost_output['capex_per_MWh'] = round(cost_output['annual_capex'] / annual_demand_district_MWh, 2)
     cost_output['annual_demand_district_MWh'] = round(annual_demand_district_MWh, 2)
-    cost_output['annual_demand_building_scale_MWh'] = round(annual_demand_building_scale_MWh, 2)
     cost_output['annual_demand_network_MWh'] = round(annual_demand_network_MWh, 2)
     cost_output['opex_plant'] = round(cost_storage_df.loc['opex_plant'][0], 2)
     cost_output['opex_pump'] = round(cost_storage_df.loc['opex_pump'][0], 2)
@@ -629,8 +633,13 @@ def main(config):
     cost_output['capex_CT'] = round(cost_storage_df.loc['capex_CT'][0], 2)
     cost_output['avg_diam_m'] = average_diameter_m
     cost_output['network_length_m'] = length_m
+    cost_output['chiller_capacity_factor'] = round(chiller_capacity_factor,5)
+    cost_output['number_of_chillers'] = number_of_chillers
+    cost_output['plant_heat_yearly_MWh'] = plant_heat_yearly_kWh/1000
+
     cost_output = pd.DataFrame.from_dict(cost_output, orient='index').T
     cost_output.to_csv(locator.get_optimization_network_layout_costs_file(config.thermal_network.network_type))
+    print(locator.get_optimization_network_layout_costs_file(config.thermal_network.network_type))
     return
 
 

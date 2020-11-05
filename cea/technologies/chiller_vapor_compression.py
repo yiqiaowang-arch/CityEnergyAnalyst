@@ -138,7 +138,7 @@ def calc_Cinv_VCC(Q_nom_W, locator, technology_type):
                 Opex_fixed_VCC_USD = Opex_fixed_VCC_USD + InvC * Inv_OM
                 Capex_VCC_USD = Capex_VCC_USD + InvC
 
-    return Capex_a_VCC_USD, Opex_fixed_VCC_USD, Capex_VCC_USD
+    return Capex_a_VCC_USD, Opex_fixed_VCC_USD, Capex_VCC_USD, number_of_chillers,  max_chiller_size
 
 
 def calc_VCC_COP(weather_data, load_types, centralized=True):
