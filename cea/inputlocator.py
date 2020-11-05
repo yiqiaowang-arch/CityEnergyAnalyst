@@ -559,9 +559,9 @@ class InputLocator(object):
         Network layout files for nodes of district heating or cooling networks
         """
         if not network_name:
-            file_name = 'Nominal_EdgeMassFlow_at_design_' + network_type + '_' + '_kgpers.csv'
+            file_name = 'DC__massflow_edges_kgs.csv'
         else:
-            file_name = 'Nominal_EdgeMassFlow_at_design_' + network_type + '_' + network_name + '_kgpers.csv'
+            file_name = 'DC__massflow_edges_kgs.csv'
 
         return os.path.join(self.get_thermal_network_folder(), file_name)
 
@@ -570,9 +570,9 @@ class InputLocator(object):
         Network layout files for nodes of district heating or cooling networks
         """
         if not network_name:
-            file_name = 'Nominal_NodeMassFlow_at_design_' + network_type + '_' + '_kgpers.csv'
+            file_name = 'DC__massflow_nodes_kgs.csv'
         else:
-            file_name = 'Nominal_NodeMassFlow_at_design_' + network_type + '_' + network_name + '_kgpers.csv'
+            file_name = 'DC__massflow_nodes_kgs.csv'
 
         return os.path.join(self.get_thermal_network_folder(), file_name)
 

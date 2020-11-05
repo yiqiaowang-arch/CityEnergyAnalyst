@@ -113,9 +113,9 @@ def calc_Ctot_network_pump(network_info):
     Opex_var = deltaP_kW * 1000 * network_info.prices.ELEC_PRICE # why not returned?
 
     if network_info.network_type == 'DH':
-        deltaPmax = np.max(network_info.network_features.DeltaP_DHN)
+        deltaPmax = 0
     else:
-        deltaPmax = np.max(network_info.network_features.DeltaP_DCN)
+        deltaPmax = 0
 
     # get pumping energy and peak load
     peak_pump_power_W = pumps.calc_pump_power(mdotnMax_kgpers, deltaPmax)
@@ -139,7 +139,7 @@ def calc_Ctot_cooling_plants(network_info):
     # read in plant heat requirement
     plant_heat_hourly_kWh = pd.read_csv(
         network_info.locator.get_thermal_network_plant_heat_requirement_file(
-            network_info.network_type, network_info.network_names))
+            network_info.network_type, ""))
     # read in number of plants
     number_of_plants = len(plant_heat_hourly_kWh.columns)
 
@@ -591,16 +591,20 @@ def main(config):
     # calculate network total length and average diameter
     length_m, average_diameter_m = calc_network_size(network_info)
 
-    # calculate annual space cooling demands
+
+
+    # calculate annual space cooling demands and chiller capacity factor
     if network_type == 'DC':
         annual_demand_district_MWh = total_demand['Qcs_sys_MWhyr'].sum()
-        annual_demand_building_scale_MWh = 0
+        annual_demand_disconnected_MWh = 0
         for building_index in disconnected_buildings_index:
-            annual_demand_building_scale_MWh += total_demand.iloc[building_index, 'Qcs_sys_MWhyr']
-        annual_demand_network_MWh = annual_demand_district_MWh - annual_demand_building_scale_MWh
+            annual_demand_disconnected_MWh += total_demand.ix[building_index, 'Qcs_sys_MWhyr']
+        annual_demand_network_MWh = annual_demand_district_MWh - annual_demand_disconnected_MWh
+        chiller_capacity_factor = (demand_met_kWh*1000) /(number_of_chillers*max_chiller_size*8760)
+        print('chiller_capacity_factor', round (chiller_capacity_factor, 4))
+
     else:
         raise ValueError('This optimization procedure is not ready for district heating yet!')
-
 
     # write outputs
     cost_output = {}

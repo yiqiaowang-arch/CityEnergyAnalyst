@@ -237,6 +237,16 @@ Networks:
       - [get_demand_results_file, building_name]
       - [get_database_conversion_systems]
       - [get_weather_file]
+      -
+  - name: thermal-network-costs
+    label: Thermo network optimization
+    description: Calculate the CAPEX and OPEX of the networks
+    interfaces: [cli, dashboard]
+    module: cea.technologies.thermal_network.thermal_network_costs
+    parameters: ['general:scenario', 'general:multiprocessing',
+                 'general:number-of-cpus-to-keep-free', 'thermal-network', 'thermal-network-optimization',
+                 'network-layout']
+
 
 Optimization:
 
