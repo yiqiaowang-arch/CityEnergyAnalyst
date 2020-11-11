@@ -869,25 +869,30 @@ class InputLocator(object):
     # OUTPUTS
 
     # SOLAR-RADIATION
+
     def get_solar_radiation_folder(self):
         """scenario/outputs/data/solar-radiation"""
         return self._ensure_folder(self.scenario, 'outputs', 'data', 'solar-radiation')
 
     def get_radiation_building(self, building):
         """scenario/outputs/data/solar-radiation/${building}_insolation.json"""
-        return os.path.join(self.get_solar_radiation_folder(), '%s_radiation.csv' % building)
+        radiation_ori = r'C:/Users/ShiZhongming/Documents/CEA/test/D\0_gfa_transferred/outputs/data/solar-radiation'
+        return os.path.join(radiation_ori, '%s_radiation.csv' % building)
 
     def get_radiation_building_sensors(self, building):
+        radiation_ori = r'C:/Users/ShiZhongming/Documents/CEA/test/D\0_gfa_transferred/outputs/data/solar-radiation'
         """scenario/outputs/data/solar-radiation/${building}_insolation_Whm2.json"""
-        return os.path.join(self.get_solar_radiation_folder(), '%s_insolation_Whm2.json' % building)
+        return os.path.join(radiation_ori, '%s_insolation_Whm2.json' % building)
 
     def get_radiation_metadata(self, building):
+        radiation_ori = r'C:/Users/ShiZhongming/Documents/CEA/test/D\0_gfa_transferred/outputs/data/solar-radiation'
         """scenario/outputs/data/solar-radiation/{building}_geometrgy.csv"""
-        return os.path.join(self.get_solar_radiation_folder(), '%s_geometry.csv' % building)
+        return os.path.join(radiation_ori, '%s_geometry.csv' % building)
 
     def get_radiation_materials(self):
+        radiation_ori = r'C:/Users/ShiZhongming/Documents/CEA/test/D\0_gfa_transferred/outputs/data/solar-radiation'
         """scenario/outputs/data/solar-radiation/{building}_geometrgy.csv"""
-        return os.path.join(self.get_solar_radiation_folder(), 'buidling_materials.csv')
+        return os.path.join(radiation_ori, 'buidling_materials.csv')
 
     def solar_potential_folder(self):
         return self._ensure_folder(self.scenario, 'outputs', 'data', 'potentials', 'solar')
