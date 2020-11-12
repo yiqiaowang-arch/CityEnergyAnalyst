@@ -352,7 +352,7 @@ class InputLocator(object):
     def get_weather_file(self):
         """inputs/weather/weather.epw
         path to the weather file to use for simulation - run weather-helper to set this"""
-        return os.path.join(self.get_weather_folder(), "weather.epw")
+        return os.path.join('C:/Users/ShiZhongming/Documents/CEA/test/D/0_gfa_transferred/inputs/weather', "weather.epw")
 
     def get_weather(self, name=None):
         """weather/{name}.epw Returns the path to a weather file with the name ``name``. This can either be one
@@ -540,13 +540,13 @@ class InputLocator(object):
 
     def get_network_layout_edges_shapefile(self, network_type, network_name=""):
         """scenario/outputs/thermal-network/DH or DC/network-edges.shp"""
-        shapefile_path = os.path.join(self.get_input_network_folder(network_type, network_name), 'edges.shp')
+        shapefile_path = os.path.join('C:/Users/ShiZhongming/Documents/CEA/test/D/0_gfa_transferred/outputs/data/thermal-network\DC', 'edges.shp')
         check_cpg(shapefile_path)
         return shapefile_path
 
     def get_network_layout_nodes_shapefile(self, network_type, network_name=""):
         """scenario/outputs/thermal-network/DH or DC/network-nodes.shp"""
-        shapefile_path = os.path.join(self.get_input_network_folder(network_type, network_name), 'nodes.shp')
+        shapefile_path = os.path.join('C:/Users/ShiZhongming/Documents/CEA/test/D/0_gfa_transferred/outputs/data/thermal-network\DC', 'nodes.shp')
         check_cpg(shapefile_path)
         return shapefile_path
 
