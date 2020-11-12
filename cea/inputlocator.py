@@ -463,6 +463,10 @@ class InputLocator(object):
         """scenario/inputs/building-properties/building_occupancy.dbf"""
         return os.path.join(self.get_building_properties_folder(), 'typology.dbf')
 
+    def get_excel_to_dbf(self):
+        """scenario/inputs/building-properties/typology.xlsx"""
+        return os.path.join(self.get_building_properties_folder(), 'typology.xlsx')
+
     def get_building_supply(self):
         """scenario/inputs/building-properties/building_supply.dbf"""
         return os.path.join(self.get_building_properties_folder(), 'supply_systems.dbf')

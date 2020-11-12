@@ -80,9 +80,9 @@ def dbf_to_dataframe(dbf_path, index=None, cols=None, include_index=False):
         return pd.DataFrame(data)
 
 
-def xls_to_dbf(input_file, output_path, output_file_name):
+def xls_to_dbf(input_file, output_file):
     df = pd.read_excel(input_file)
-    output_file = os.path.join(output_path, output_file_name + ".dbf")
+    #output_file = os.path.join(output_path, output_file_name + ".dbf")
     dataframe_to_dbf(df, output_file)
 
 
@@ -93,14 +93,14 @@ def dbf_to_xls(input_file, output_path, output_file_name):
 
 def main(config):
     assert os.path.exists(config.scenario), 'Scenario not found: %s' % config.scenario
-    input_file = config.dbf_tools.input_file
-    output_file_name = config.dbf_tools.output_file_name
-    output_path = config.dbf_tools.output_path
+    locator = cea.inputlocator.InputLocator(scenario=config.scenario)
+    input_file = locator.get_excel_to_dbf()
+    output_file = locator.get_building_typology()
 
     if input_file.endswith('.dbf'):
-        dbf_to_xls(input_file=input_file, output_path=output_path, output_file_name=output_file_name)
+        dbf_to_xls(input_file=input_file, output_file=output_file)
     elif input_file.endswith('.xls') or input_file.endswith('.xlsx'):
-        xls_to_dbf(input_file=input_file, output_path=output_path, output_file_name=output_file_name)
+        xls_to_dbf(input_file=input_file, output_file=output_file)
     else:
         print('input file type not supported')
 

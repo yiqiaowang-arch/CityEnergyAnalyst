@@ -23,13 +23,17 @@ def main(config):
     input_file = config.dbf_tools.input_file
     output_file_name = config.dbf_tools.output_file_name
     output_path = config.dbf_tools.output_path
+    locator = cea.inputlocator.InputLocator(scenario=config.scenario)
+    input_file = locator.get_excel_to_dbf()
+    output_file = locator.get_building_typology()
+
 
     assert os.path.exists(input_file), 'Input file not found: %s' % input_file
 
     # print out all configuration variables used by this script
     print("Running excel-to-dbf with excel-file = %s" % input_file)
 
-    cea.utilities.dbf.xls_to_dbf(input_file=input_file, output_path=output_path, output_file_name=output_file_name)
+    cea.utilities.dbf.xls_to_dbf(input_file=input_file, output_file=output_file)
 
 
 if __name__ == '__main__':
