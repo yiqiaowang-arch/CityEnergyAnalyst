@@ -13,7 +13,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
-
+import datetime
 from typing import List, Tuple
 import cea.config
 import cea.inputlocator
@@ -33,7 +33,8 @@ __status__ = "Production"
 
 
 
-def archetypes_mapper(locator,
+def archetypes_mapper(t0,
+                      locator,
                       update_architecture_dbf,
                       update_air_conditioning_systems_dbf,
                       update_indoor_comfort_dbf,
@@ -68,10 +69,12 @@ def archetypes_mapper(locator,
         describes the queried thermal properties of buildings
     """
     # get occupancy and age files
+    print("Initiated Archetypes Mapper. Execution time: %.2fs" % (datetime.datetime.now() - t0).total_seconds())
     building_typology_df = dbf_to_dataframe(locator.get_building_typology())
 
     # validate list of uses in case study
     list_uses = get_list_of_uses_in_case_study(building_typology_df)
+
 
     # get occupant densities from archetypes schedules
     occupant_densities = {}
@@ -84,17 +87,17 @@ def archetypes_mapper(locator,
 
     # get properties about the construction and architecture
     if update_architecture_dbf:
-        architecture_mapper(locator, building_typology_df)
+        architecture_mapper(t0, locator, building_typology_df)
 
     # get properties about types of HVAC systems
     if update_air_conditioning_systems_dbf:
-        aircon_mapper(locator, building_typology_df)
+        aircon_mapper(t0, locator, building_typology_df)
 
     if update_indoor_comfort_dbf:
-        indoor_comfort_mapper(list_uses, locator, occupant_densities, building_typology_df)
+        indoor_comfort_mapper(t0, list_uses, locator, occupant_densities, building_typology_df)
 
     if update_internal_loads_dbf:
-        internal_loads_mapper(list_uses, locator, occupant_densities, building_typology_df)
+        internal_loads_mapper(t0, list_uses, locator, occupant_densities, building_typology_df)
 
     if update_schedule_operation_cea:
         calc_mixed_schedule(locator, building_typology_df, buildings)
@@ -103,7 +106,8 @@ def archetypes_mapper(locator,
         supply_mapper(locator, building_typology_df)
 
 
-def indoor_comfort_mapper(list_uses, locator, occupant_densities, building_typology_df):
+def indoor_comfort_mapper(t0, list_uses, locator, occupant_densities, building_typology_df):
+    print("Reading INDOOR_COMFORT. Execution time: %.2fs" % (datetime.datetime.now() - t0).total_seconds())
     comfort_DB = pd.read_excel(locator.get_database_use_types_properties(), 'INDOOR_COMFORT')
     # define comfort
     prop_comfort_df = building_typology_df.merge(comfort_DB, left_on='1ST_USE', right_on='code')
@@ -116,7 +120,7 @@ def indoor_comfort_mapper(list_uses, locator, occupant_densities, building_typol
               'Ve_lsp',
               'RH_min_pc',
               'RH_max_pc']
-    prop_comfort_df_merged = calculate_average_multiuse(fields,
+    prop_comfort_df_merged = calculate_average_multiuse(t0, fields,
                                                         prop_comfort_df,
                                                         occupant_densities,
                                                         list_uses,
@@ -124,7 +128,8 @@ def indoor_comfort_mapper(list_uses, locator, occupant_densities, building_typol
     dataframe_to_dbf(prop_comfort_df_merged[fields], locator.get_building_comfort())
 
 
-def internal_loads_mapper(list_uses, locator, occupant_densities, building_typology_df):
+def internal_loads_mapper(t0, list_uses, locator, occupant_densities, building_typology_df):
+    print("Reading INTERNAL_LOADS. Execution time: %.2fs" % (datetime.datetime.now() - t0).total_seconds())
     internal_DB = pd.read_excel(locator.get_database_use_types_properties(), 'INTERNAL_LOADS')
     # define comfort
     prop_internal_df = building_typology_df.merge(internal_DB, left_on='1ST_USE', right_on='code')
@@ -143,7 +148,7 @@ def internal_loads_mapper(list_uses, locator, occupant_densities, building_typol
               'Qhpro_Wm2',
               'Qcpro_Wm2',
               'Epro_Wm2']
-    prop_internal_df_merged = calculate_average_multiuse(fields,
+    prop_internal_df_merged = calculate_average_multiuse(t0, fields,
                                                          prop_internal_df,
                                                          occupant_densities,
                                                          list_uses,
@@ -152,6 +157,7 @@ def internal_loads_mapper(list_uses, locator, occupant_densities, building_typol
 
 
 def supply_mapper(locator, building_typology_df):
+    print("11")
     supply_DB = pd.read_excel(locator.get_database_construction_standards(), 'SUPPLY_ASSEMBLIES')
     prop_supply_df = building_typology_df.merge(supply_DB, left_on='STANDARD', right_on='STANDARD')
     fields = ['Name',
@@ -161,7 +167,8 @@ def supply_mapper(locator, building_typology_df):
               'type_el']
     dataframe_to_dbf(prop_supply_df[fields], locator.get_building_supply())
 
-def aircon_mapper(locator, typology_df):
+def aircon_mapper(t0, locator, typology_df):
+    print("Reading HVAC_ASSEMBLIES. Execution time: %.2fs" % (datetime.datetime.now() - t0).total_seconds())
     air_conditioning_DB = pd.read_excel(locator.get_database_construction_standards(), 'HVAC_ASSEMBLIES')
     # define HVAC systems types
     prop_HVAC_df = typology_df.merge(air_conditioning_DB, left_on='STANDARD', right_on='STANDARD')
@@ -179,7 +186,8 @@ def aircon_mapper(locator, typology_df):
     dataframe_to_dbf(prop_HVAC_df[fields], locator.get_building_air_conditioning())
 
 
-def architecture_mapper(locator, typology_df):
+def architecture_mapper(t0, locator, typology_df):
+    print("Reading ENVELOPE ASSEMBLIES. Execution time: %.2fs" % (datetime.datetime.now() - t0).total_seconds())
     architecture_DB = pd.read_excel(locator.get_database_construction_standards(), 'ENVELOPE_ASSEMBLIES')
     prop_architecture_df = typology_df.merge(architecture_DB, left_on='STANDARD', right_on='STANDARD')
     fields = ['Name',
@@ -205,6 +213,7 @@ def architecture_mapper(locator, typology_df):
 
 
 def calc_code(code1, code2, code3, code4):
+    print("8")
     return str(code1) + str(code2) + str(code3) + str(code4)
 
 
@@ -224,6 +233,7 @@ def calc_mainuse(uses_df, uses):
     # print a warning if there are equal shares of more than one "main" use
     # check if 'Name' is already the index, this is necessary because the function is used in data-helper
     #  and in building properties
+    print("7")
     if uses_df.index.name not in ['Name']:
         # this is the behavior in data-helper
         indexed_df = uses_df.set_index('Name')
@@ -233,6 +243,7 @@ def calc_mainuse(uses_df, uses):
         uses_df = uses_df.reset_index()
 
     for building in indexed_df.index:
+
         mainuses = [use for use in uses if
                     (indexed_df.loc[building, use] == indexed_df.max(axis=1)[building]) and (use != 'PARKING')]
         if len(mainuses) > 1:
@@ -252,6 +263,7 @@ def calc_mainuse(uses_df, uses):
 
 
 def calc_comparison(array_second, array_max):
+    print("6")
     if array_max == 'PARKING':
         if array_second != 'PARKING':
             array_max = array_second
@@ -275,7 +287,7 @@ def correct_archetype_areas(prop_architecture_df, architecture_DB, list_uses):
 
     :rtype Tuple[List[float], List[float], List[float], List[float]]
     """
-
+    print("5")
     indexed_DB = architecture_DB.set_index('Code')
 
     # weighted average of values
@@ -325,12 +337,13 @@ def get_prop_architecture(typology_df, architecture_DB):
     :return prop_architecture_df: DataFrame containing the architectural properties of each building in the area
     :rtype prop_architecture_df: DataFrame
     """
+    print("4")
     # create prop_architecture_df based on the construction categories and archetype architecture database
     prop_architecture_df = typology_df.merge(architecture_DB, left_on='STANDARD', right_on='STANDARD')
     return prop_architecture_df
 
 
-def calculate_average_multiuse(fields, properties_df, occupant_densities, list_uses, properties_DB, list_var_names=None,
+def calculate_average_multiuse(t0, fields, properties_df, occupant_densities, list_uses, properties_DB, list_var_names=None,
                                list_var_values=None):
     """
     This script calculates the average internal loads and ventilation properties for multiuse buildings.
@@ -354,12 +367,14 @@ def calculate_average_multiuse(fields, properties_df, occupant_densities, list_u
     :return properties_df: the same DataFrame as the input parameter, but with the updated properties for multiuse
         buildings
     """
-
+    print("Calculating average multiuse. Execution time: %.2fs" % (datetime.datetime.now() - t0).total_seconds())
     list_var_names, list_var_values = get_lists_of_var_names_and_var_values(list_var_names, list_var_values, properties_df)
 
     properties_DB = properties_DB.set_index('code')
     for column in fields:
         if column in ['Ve_lsp', 'Qs_Wp', 'X_ghp', 'Vww_ldp', 'Vw_ldp']:
+            print('Mapping Column: %s for all buildings. Execution time: %.2fs'
+                  % (column, (datetime.datetime.now() - t0).total_seconds()))
             # some properties are imported from the Excel files as int instead of float
             properties_df[column] = properties_df[column].astype(float)
             for building in properties_df.index:
@@ -377,7 +392,10 @@ def calculate_average_multiuse(fields, properties_df, occupant_densities, list_u
                 else:
                     properties_df.loc[building, column] = 0
 
+
         elif column in ['Ea_Wm2', 'El_Wm2', 'Epro_Wm2', 'Qcre_Wm2', 'Ed_Wm2', 'Qhpro_Wm2', 'Qcpro_Wm2', 'Occ_m2p']:
+            print('Mapping Column: %s for all buildings. Execution time: %.2fs'
+                  % (column, (datetime.datetime.now() - t0).total_seconds()))
             for building in properties_df.index:
                 average = 0.0
                 for use in list_uses:
@@ -396,8 +414,9 @@ def main(config):
     Run the properties script with input from the reference case and compare the results. This ensures that changes
     made to this script (e.g. refactorings) do not stop the script from working and also that the results stay the same.
     """
-
+    t0 = datetime.datetime.now()
     print('Running archetypes-mapper with scenario = %s' % config.scenario)
+    print("Updating scripts. Execution time: %.2fs" % (datetime.datetime.now() - t0).total_seconds())
 
     update_architecture_dbf = 'architecture' in config.archetypes_mapper.input_databases
     update_air_conditioning_systems_dbf = 'air-conditioning' in config.archetypes_mapper.input_databases
@@ -406,10 +425,13 @@ def main(config):
     update_supply_systems_dbf = 'supply' in config.archetypes_mapper.input_databases
     update_schedule_operation_cea = 'schedules' in config.archetypes_mapper.input_databases
 
+    print("Setting up building and locator. Execution time: %.2fs" % (datetime.datetime.now() - t0).total_seconds())
     buildings = config.archetypes_mapper.buildings
     locator = cea.inputlocator.InputLocator(config.scenario)
 
-    archetypes_mapper(locator=locator,
+    print("Calling archtypes mapper. Execution time: %.2fs" % (datetime.datetime.now() - t0).total_seconds())
+    archetypes_mapper(t0,
+                      locator=locator,
                       update_architecture_dbf=update_architecture_dbf,
                       update_air_conditioning_systems_dbf=update_air_conditioning_systems_dbf,
                       update_indoor_comfort_dbf=update_indoor_comfort_dbf,
