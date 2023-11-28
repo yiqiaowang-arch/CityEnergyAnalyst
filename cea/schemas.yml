@@ -1585,7 +1585,7 @@ get_building_air_conditioning:
             path: get_database_air_conditioning_systems
             sheet: VENTILATION
             column: code
-      heat_starts:
+      heat_start:
         description: Start of the heating season - use 00|00 when there is none
         type: string
         regex: ^(0[1-9]|[12][0-9]|3[01])\|(0[1-9]|1[012])|00\|00$
@@ -1599,7 +1599,7 @@ get_building_air_conditioning:
         example: '31|12'
         unit: '[DD|MM]'
         values: '{00|00...31|12}'
-      cool_starts:
+      cool_start:
         description: Start of the cooling season - use 00|00 when there is none
         type: string
         regex: ^(0[1-9]|[12][0-9]|3[01])\|(0[1-9]|1[012])|00\|00$
