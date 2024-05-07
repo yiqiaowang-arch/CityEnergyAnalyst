@@ -491,6 +491,11 @@ class InputLocator(object):
         to the scenario if they are not yet present, based on the configured region for the scenario."""
         return os.path.join(self.get_databases_assemblies_folder(), 'SUPPLY.xlsx')
 
+    def get_database_supply_assemblies_new(self):
+        """Returns the database of basic supply system compositions for stand-alone buildings in the energy system
+        optimisation. """
+        return os.path.join(self.get_databases_assemblies_folder(), 'SUPPLY_NEW.xlsx')
+
     def get_database_air_conditioning_systems(self):
         return os.path.join(self.get_databases_assemblies_folder(), 'HVAC.xlsx')
 
@@ -498,18 +503,22 @@ class InputLocator(object):
         """databases/Systems/envelope_systems.csv"""
         return os.path.join(self.get_databases_assemblies_folder(), 'ENVELOPE.xlsx')
 
-
     def get_database_conversion_systems(self):
         """Returns the database of supply components for cost analysis. These are copied
         to the scenario if they are not yet present, based on the configured region for the scenario."""
         return os.path.join(self.get_databases_folder(), 'components', 'CONVERSION.xlsx')
+
+    def get_database_conversion_systems_new(self):
+        """Returns the database of supply components for analysis of different objective functions. These are copied
+        to the scenario if they are not yet present, based on the configured region for the scenario."""
+        return os.path.join(self.get_databases_folder(), 'components', 'CONVERSION_NEW.xlsx')
 
     def get_database_conversion_systems_cold_thermal_storage_names(self):
         """Return the list of thermal storage tanks"""
         if not os.path.exists(self.get_database_conversion_systems()):
             return []
         import pandas as pd
-        data = pd.read_excel(self.get_database_conversion_systems(), sheet_name="THERMAL_ENERGY_STORAGES")
+        data = pd.read_excel(self.get_database_conversion_systems(), sheet_name="TES")
         data = data[data["type"] == "COOLING"]
         names = sorted(data["code"])
         return names
@@ -524,6 +533,10 @@ class InputLocator(object):
         to the scenario if they are not yet present, based on the configured region for the scenario."""
         return os.path.join(self.get_databases_folder(), 'components', 'FEEDSTOCKS.xlsx')
 
+    def get_database_energy_carriers(self):
+        """Returns the database of supply components for cost analysis. These are copied
+        to the scenario if they are not yet present, based on the configured region for the scenario."""
+        return os.path.join(self.get_databases_folder(), 'components', 'ENERGY_CARRIERS.xlsx')
 
     def get_building_geometry_folder(self):
         """scenario/inputs/building-geometry/"""

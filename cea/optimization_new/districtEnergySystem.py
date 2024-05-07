@@ -233,7 +233,7 @@ class DistrictEnergySystem(object):
         network_ids = [network.identifier for network in self.networks]
         self.subsystem_demands = dict([(network_id,
                                         EnergyFlow('primary', 'consumer', energy_carrier,
-                                                   pd.Series(0.0, index=EnergyFlow.time_series))
+                                                   pd.Series(0.0, index=np.arange(EnergyFlow.time_frame)))
                                         )
                                        for network_id in network_ids])
 
@@ -242,7 +242,7 @@ class DistrictEnergySystem(object):
                                      if building.identifier in network.connected_buildings]
             aggregated_demand = EnergyFlow.aggregate(building_demand_flows)[0]
             # subtract network losses (losses are negative, therefore subtracting them increases the demand requirement)
-            aggregated_demand -= network.network_losses
+            aggregated_demand.profile -= network.network_losses
             self.subsystem_demands[network.identifier] = aggregated_demand
 
         return self.subsystem_demands
