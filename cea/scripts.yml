@@ -242,7 +242,7 @@ Energy potentials:
 Networks:
 
   - name: network-layout
-    label: Thermal network Part I (layout)
+    label: Thermal network Part I - layout
     description: Create a potential layout of the network with the minimum spanning tree
     interfaces: [cli, dashboard]
     module: cea.technologies.network_layout.main
@@ -253,8 +253,8 @@ Networks:
       - [get_zone_geometry]
 
   - name: thermal-network
-    label: Thermal network Part II (simulation)
-    description: Solve the thermal hydraulic network. Execute Thermal network Part I (layout) first.
+    label: Thermal network Part II - simulation
+    description: Solve the thermal hydraulic network. Execute Thermal network Part I - layout first.
     interfaces: [cli, dashboard]
     module: cea.technologies.thermal_network.thermal_network
     parameters: ['general:scenario', 'general:multiprocessing',
