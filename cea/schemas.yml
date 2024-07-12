@@ -3485,11 +3485,13 @@ get_database_conversion_systems:
             values:
               - gas
               - oil
-              - gas-cond
+              - electricity
+              - wood
+              - biomass
           description: type of boiler
           type: string
           unit: 'NA'
-          values: '{"gas", "oil", "gas-cond"}'
+          values: '{"gas", "oil", "electricity", "wood", "biomass"}'
         unit:
           description: unit of the min/max capacity
           type: string
@@ -4032,10 +4034,11 @@ get_database_conversion_systems:
             values:
               - 'counter-flow, plate'
               - 'concurrent flow, tube'
+              - '-'
           description: type of heat exchanger
           type: string
           unit: 'NA'
-          values: '{"counter-flow, plate", "concurrent flow, tube"}'
+          values: '{"counter-flow, plate", "concurrent flow, tube", "-"}'
         unit:
           description: unit of the min/max capacity
           type: string
