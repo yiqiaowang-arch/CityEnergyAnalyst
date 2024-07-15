@@ -32,7 +32,6 @@ def apply_wntr_fix():
         if wntr.__version__ != '0.2.3':
             raise ImportError(f"Require wntr version 0.2.3, found {wntr.__version__}")
 
-        print("Applying fix for Apple Silicon")
         # Change where wntr looks for libepanet
         import wntr.epanet.toolkit
         wntr.epanet.toolkit.epanet_toolkit = "cea.lib"

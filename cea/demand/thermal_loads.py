@@ -242,8 +242,8 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['COAL_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['OIL_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
         elif energy_source == "NATURALGAS":
@@ -253,8 +253,8 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
         elif energy_source == "OIL":
@@ -264,8 +264,8 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
         elif energy_source == "COAL":
@@ -276,10 +276,9 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
         elif energy_source == "WOOD":
             tsd['NG_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['COAL_hs'] = np.zeros(HOURS_IN_YEAR)
@@ -287,8 +286,8 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['WOOD_hs'] = tsd['Qhs_sys'] / efficiency_average_year
             tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
         elif energy_source == "WETBIOMASS":
@@ -298,8 +297,8 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = tsd['Qhs_sys'] / efficiency_average_year
-            tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['WETBIOMASS_hs'] = tsd['Qhs_sys'] / efficiency_average_year
+            tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
         elif energy_source == "DRYBIOMASS":
@@ -309,8 +308,8 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['DRYBIOM_hs'] = tsd['Qhs_sys'] / efficiency_average_year
+            tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['DRYBIOMASS_hs'] = tsd['Qhs_sys'] / efficiency_average_year
             tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
         elif energy_source == "BIOGAS":
@@ -320,8 +319,8 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['BIOGAS_hs'] = tsd['Qhs_sys'] / efficiency_average_year
             tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
         elif energy_source == "SOLAR":
@@ -331,8 +330,8 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['SOLAR_hs'] = tsd['Qhs_sys'] / efficiency_average_year
         elif energy_source == "NONE":
@@ -342,8 +341,8 @@ def calc_Qhs_sys(bpr, tsd):
             tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-            tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+            tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
             tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
         else:
@@ -355,8 +354,8 @@ def calc_Qhs_sys(bpr, tsd):
         tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
         tsd['DH_hs'] = tsd['Qhs_sys'] / efficiency_average_year
         tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-        tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-        tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+        tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+        tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
         tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
         tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
     elif scale_technology == "NONE":
@@ -366,8 +365,8 @@ def calc_Qhs_sys(bpr, tsd):
         tsd['WOOD_hs'] = np.zeros(HOURS_IN_YEAR)
         tsd['DH_hs'] = np.zeros(HOURS_IN_YEAR)
         tsd['E_hs'] = np.zeros(HOURS_IN_YEAR)
-        tsd['WETBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
-        tsd['DRYBIOM_hs'] = np.zeros(HOURS_IN_YEAR)
+        tsd['WETBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
+        tsd['DRYBIOMASS_hs'] = np.zeros(HOURS_IN_YEAR)
         tsd['BIOGAS_hs'] = np.zeros(HOURS_IN_YEAR)
         tsd['SOLAR_hs'] = np.zeros(HOURS_IN_YEAR)
     else:
@@ -536,10 +535,16 @@ def initialize_timestep_data(bpr, weather_data):
                   'COAL_hs',
                   'OIL_hs',
                   'WOOD_hs',
+                  'WETBIOMASS_hs',
+                  'DRYBIOMASS_hs',
+                  'BIOGAS_hs',
                   'NG_ww',
                   'COAL_ww',
                   'OIL_ww',
                   'WOOD_ww',
+                  'WETBIOMASS_ww',
+                  'DRYBIOMASS_ww',
+                  'BIOGAS_ww',
                   'vfw_m3perh']
     nan_fields.extend(TSD_KEYS_HEATING_LOADS)
     nan_fields.extend(TSD_KEYS_COOLING_LOADS)
@@ -604,10 +609,16 @@ def update_timestep_data_no_conditioned_area(tsd):
                    'COAL_hs',
                    'OIL_hs',
                    'WOOD_hs',
+                   'WETBIOMASS_hs',
+                   'DRYBIOMASS_hs',
+                   'BIOGAS_hs',
                    'NG_ww',
                    'COAL_ww',
                    'OIL_ww',
                    'WOOD_ww',
+                   'WETBIOMASS_ww',
+                   'DRYBIOMASS_ww',
+                   'BIOGAS_ww',
                    'vfw_m3perh',
                    'DH_hs',
                    'Qhs_sys', 'Qhs',
