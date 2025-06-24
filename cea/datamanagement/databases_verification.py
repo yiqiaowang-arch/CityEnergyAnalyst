@@ -2,13 +2,17 @@
 Databases verification
 This tool is used as to check the format of each database
 """
-
+from __future__ import annotations
 from cea.schemas import schemas
 import pandas as pd
 import re
 
 from cea.utilities import simple_memoize
 from cea.utilities.schedule_reader import get_all_schedule_names
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    import geopandas as gpd
+
 
 COLUMNS_ZONE_GEOMETRY = ['name', 'floors_bg', 'floors_ag', 'height_bg', 'height_ag']
 COLUMNS_SURROUNDINGS_GEOMETRY = ['name', 'height_ag', 'floors_ag']
@@ -29,7 +33,7 @@ def assert_columns_names(dataframe: pd.DataFrame, columns):
             " names comply with:", columns)
 
 
-def assert_input_geometry_acceptable_values_floor_height(zone_df: pd.DataFrame):
+def assert_input_geometry_acceptable_values_floor_height(zone_df: gpd.GeoDataFrame):
     # Rule 0. nothing can be negative
     numeric_dtypes = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
     zone_df_data = zone_df.select_dtypes(include=numeric_dtypes)
