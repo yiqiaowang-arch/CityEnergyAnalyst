@@ -14,15 +14,25 @@ logger = getCEAServerLogger("cea-server-settings")
 
 
 class StackAuthSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix=ENV_VAR_PREFIX + "auth_")
+    model_config = SettingsConfigDict(env_prefix=ENV_VAR_PREFIX + "auth_",
+                                      env_file=('.env', '.env.local'), extra="ignore")
 
     project_id: Optional[str] = None
     publishable_client_key: Optional[str] = None
 
 
+class LimitSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix=ENV_VAR_PREFIX + "limit_",
+                                      env_file=('.env', '.env.local'), extra="ignore")
+    num_projects: Optional[int] = None
+    num_scenarios: Optional[int] = None
+    num_buildings: Optional[int] = None
+
+
 class Settings(BaseSettings):
     # Use "cea_" as prefix for env vars
-    model_config = SettingsConfigDict(env_prefix=ENV_VAR_PREFIX)
+    model_config = SettingsConfigDict(env_prefix=ENV_VAR_PREFIX,
+                                      env_file=('.env', '.env.local'), extra="ignore")
 
     # Settings from cea.config
     host: Optional[str] = None

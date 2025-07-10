@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional, List, Union
 
 import geopandas
 import pandas as pd
+import sqlalchemy.exc
 from fastapi import APIRouter, UploadFile, Form, HTTPException, status, Request, Path, Depends
 from geopandas import GeoDataFrame
 from osgeo import gdal
@@ -17,7 +18,6 @@ from shapely.geometry import shape
 from starlette.datastructures import UploadFile as _UploadFile
 from typing_extensions import Annotated
 
-import cea.api
 import cea.config
 import cea.inputlocator
 from cea.datamanagement.databases_verification import verify_input_geometry_zone, verify_input_geometry_surroundings, \
@@ -26,9 +26,13 @@ from cea.datamanagement.surroundings_helper import generate_empty_surroundings
 from cea.interfaces.dashboard.dependencies import CEAConfig, CEADatabaseConfig, CEAProjectRoot, CEAProjectInfo, create_project, CEAUserID, \
     CEASeverDemoAuthCheck
 from cea.interfaces.dashboard.lib.database.session import SessionDep
+from cea.interfaces.dashboard.lib.logs import getCEAServerLogger
+from cea.interfaces.dashboard.settings import LimitSettings, get_settings
 from cea.interfaces.dashboard.utils import secure_path, OutsideProjectRootError
 from cea.utilities.dbf import dbf_to_dataframe
 from cea.utilities.standardize_coordinates import get_geographic_coordinate_system, raster_to_WSG_and_UTM
+
+logger = getCEAServerLogger("cea-server-project")
 
 router = APIRouter()
 
@@ -41,11 +45,12 @@ GENERATE_TERRAIN_CEA = 'generate-terrain-cea'
 GENERATE_STREET_CEA = 'generate-street-cea'
 EMTPY_GEOMETRY = 'none'
 
+class ProjectPath(BaseModel):
+    project: str
 
 class ScenarioPath(BaseModel):
     project: str
     scenario_name: str
-
 
 class NewProject(BaseModel):
     project_name: str
@@ -84,29 +89,37 @@ class CreateScenario(BaseModel):
 
     @staticmethod
     async def _get_geometry_data(file: Union[str, UploadFile], filename: str) -> GeoDataFrame:
-        source = file
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            if isinstance(source, _UploadFile):
-
-                def extract_zip(filestream: bytes, destination: str) -> None:
+        if isinstance(file, str):
+            data = geopandas.read_file(file).to_crs(get_geographic_coordinate_system())
+            return data
+        
+         # Save file to temporary directory if it is a UploadFile
+        if isinstance(file, _UploadFile):                 
+            with tempfile.TemporaryDirectory() as tmpdir:
+                try:
                     import zipfile
                     from io import BytesIO
 
-                    with zipfile.ZipFile(BytesIO(filestream)) as zf:
-                        zf.extractall(destination)
+                    with zipfile.ZipFile(BytesIO(await file.read())) as zf:
+                        zf.extractall(tmpdir)
 
-                extract_zip(await source.read(), tmpdir)
+                    file_path = os.path.join(tmpdir, filename)
+                    if not os.path.exists(file_path):
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f'Could not find {filename} in zip file',
+                        )
+                    
+                    data = geopandas.read_file(file_path).to_crs(get_geographic_coordinate_system())
+                    return data
+                finally:
+                    # Explicitly close file buffer
+                    await file.close()
 
-                source = os.path.join(tmpdir, filename)
-                if not os.path.exists(source):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f'Could not find {filename} in zip file',
-                    )
-
-            data = geopandas.read_file(source).to_crs(get_geographic_coordinate_system())
-        return data
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'Could not process file: {filename}',
+        )
 
     async def get_zone_file(self):
         return await self._get_geometry_data(self.user_zone, "zone.shp")
@@ -153,17 +166,10 @@ class ConfigProjectInfo(BaseModel):
     project: str
     scenario: str
 
+class NewScenarioInfo(BaseModel):
+    name: str
 
-
-@router.get('/choices')
-async def get_project_choices(project_root: CEAProjectRoot):
-    """Return project choices based on the project root"""
-    if project_root is None or project_root == "":
-        raise HTTPException(
-            status_code=400,
-            detail="Project root not defined",
-        )
-
+async def get_project_choices(project_root):
     try:
         projects = []
         for _path in os.listdir(project_root):
@@ -172,7 +178,7 @@ async def get_project_choices(project_root: CEAProjectRoot):
                 # Optionally: Add validation that this is a valid project directory
                 projects.append(_path)
         if not projects:
-            return {"projects": [], "warning": "No valid projects found in directory"}
+            logger.warning("No valid projects found in directory")
     except PermissionError:
         raise HTTPException(
             status_code=403,
@@ -180,7 +186,7 @@ async def get_project_choices(project_root: CEAProjectRoot):
         )
     except FileNotFoundError:
         raise HTTPException(
-            status_code=404,
+            status_code=400,
             detail="Project root directory not found",
         )
     except OSError as e:
@@ -188,8 +194,20 @@ async def get_project_choices(project_root: CEAProjectRoot):
             status_code=500,
             detail=f"Failed to read project root: {str(e)}",
         )
+
+    return projects
+
+@router.get('/choices')
+async def get_project_choices_route(project_root: CEAProjectRoot):
+    """Return project choices based on the project root"""
+    if project_root is None or project_root == "":
+        raise HTTPException(
+            status_code=400,
+            detail="Project root not defined",
+        )
+
     return {
-        "projects": projects
+        "projects": await get_project_choices(project_root),
     }
 
 @router.get('/config')
@@ -239,6 +257,17 @@ async def create_new_project(project_root: CEAProjectRoot, new_project: NewProje
     """
     Create new project folder
     """
+    settings = get_settings()
+    limit_settings = LimitSettings()
+    # FIXME: project_choices will not work if project_root is not a directory
+    if not settings.local and os.path.exists(project_root):
+        num_projects = len(await get_project_choices(project_root))
+        if limit_settings.num_projects is not None and limit_settings.num_projects <= num_projects:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Maximum number of projects reached ({limit_settings.num_projects}). Number of projects found: {num_projects}",
+            )
+
     if new_project.project_root is None and project_root is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -255,12 +284,22 @@ async def create_new_project(project_root: CEAProjectRoot, new_project: NewProje
         )
     try:
         os.makedirs(project, exist_ok=True)
-        # Add project to database
-        await create_project(project, user_id, session)
+        try:
+            # Add project to database
+            await create_project(project, user_id, session)
+        except sqlalchemy.exc.SQLAlchemyError as e:
+            # Remove folder if failed to create in database
+            logger.error(e)
+            os.rmdir(project)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to create new project",
+            )
     except OSError as e:
+        logger.error(e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to create new project",
         )
 
     return {'message': 'Project folder created', 'project': project}
@@ -276,7 +315,12 @@ async def update_project(project_root: CEAProjectRoot, config: CEAConfig, scenar
         project_path = os.path.join(project_root, project_path)
 
     project = secure_path(project_path)
-    scenario_name = scenario_path.scenario_name
+    scenario_name = os.path.normpath(scenario_path.scenario_name)
+    if scenario_name == "." or scenario_name == ".." or os.path.basename(scenario_name) != scenario_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid scenario name: {scenario_name}. Name should not contain path components.",
+        )
 
     if project and scenario_name:
         # Project path must exist but scenario does not have to
@@ -316,13 +360,29 @@ async def create_new_scenario_v2(project_root: CEAProjectRoot, scenario_form: An
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+    
+    settings = get_settings()
+    limit_settings = LimitSettings()
+    if not settings.local:
+        num_scenarios = len(cea.config.get_scenarios_list(cea_project))
+        if limit_settings.num_scenarios is not None and limit_settings.num_scenarios <= num_scenarios:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Maximum number of scenarios reached ({limit_settings.num_scenarios}). Number of scenarios found: {num_scenarios}",
+            )
 
-    new_scenario_path = secure_path(os.path.join(cea_project, str(scenario_form.scenario_name).strip()))
+    scenario_name = os.path.normpath(scenario_form.scenario_name)
+    if scenario_name == "." or scenario_name == ".." or os.path.basename(scenario_name) != scenario_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid scenario name: {scenario_name}. Name should not contain path components.",
+        )
 
+    new_scenario_path = secure_path(os.path.join(cea_project, str(scenario_name).strip()))
     if os.path.exists(new_scenario_path):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f'Scenario already exists - project: {cea_project}, scenario_name: {scenario_form.scenario_name}',
+            detail=f'Scenario already exists - project: {cea_project}, scenario_name: {scenario_name}',
         )
 
     async def create_zone(scenario_form, locator):
@@ -340,6 +400,14 @@ async def create_new_scenario_v2(project_root: CEAProjectRoot, scenario_form: An
 
             # Ensure that zone exists
             zone_df = geopandas.read_file(locator.get_zone_geometry())
+
+            if not settings.local:
+                num_buildings = len(zone_df)
+                if limit_settings.num_buildings is not None and limit_settings.num_buildings <= num_buildings:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Maximum number of buildings reached ({limit_settings.num_buildings}). Number of buildings found: {num_buildings}",
+                    )
 
         # Copy zone from user-input
         else:
@@ -396,7 +464,14 @@ async def create_new_scenario_v2(project_root: CEAProjectRoot, scenario_form: An
             if extension == ".dbf":
                 typology_df = dbf_to_dataframe(scenario_form.typology)
             elif extension == ".xlsx":
-                typology_df = pd.read_excel(scenario_form.typology)
+                # Explicitly handle Excel file resources
+                try:
+                    typology_df = pd.read_excel(scenario_form.typology)
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Failed to read Excel file: {str(e)}"
+                    )
             else:
                 raise Exception("Typology file must be a .dbf or .xlsx file")
 
@@ -449,9 +524,15 @@ async def create_new_scenario_v2(project_root: CEAProjectRoot, scenario_form: An
             async with scenario_form.get_terrain_file() as terrain_path:
                 # Ensure terrain is the same projection system
                 terrain = raster_to_WSG_and_UTM(terrain_path, lat, lon)
-                driver = gdal.GetDriverByName('GTiff')
-                verify_input_terrain(terrain)
-                driver.CreateCopy(locator.get_terrain(), terrain)
+                try:
+                    driver = gdal.GetDriverByName('GTiff')
+                    verify_input_terrain(terrain)
+                    driver.CreateCopy(locator.get_terrain(), terrain)
+                finally:
+                    # Properly close GDAL objects to prevent resource warnings
+                    if terrain is not None:
+                        terrain = None
+                    driver = None
 
     async def create_street(scenario_form, locator):
         if scenario_form.should_generate_street():
@@ -517,7 +598,7 @@ async def create_new_scenario_v2(project_root: CEAProjectRoot, scenario_form: An
     return {
         'message': 'Scenario created successfully',
         'project': scenario_form.project,
-        'scenario_name': scenario_form.scenario_name
+        'scenario_name': scenario_name
     }
 
 
@@ -527,11 +608,13 @@ def glob_shapefile_auxilaries(shapefile_path):
     return glob.glob('{basepath}.*'.format(basepath=os.path.splitext(shapefile_path)[0]))
 
 
+# TODO: Check if this is able to get user ID from request
 async def check_scenario_exists(request: Request, scenario: str = Path()):
     try:
         data = await request.json()
-        project = data.get("project")
-    except Exception:
+        project = secure_path(data.get("project"))
+    except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Could not determine project and scenario",
@@ -542,6 +625,13 @@ async def check_scenario_exists(request: Request, scenario: str = Path()):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Scenario does not exist.',
+        )
+    
+def validate_scenario_name(scenario_name: str):
+    if scenario_name == "." or scenario_name == ".." or os.path.basename(scenario_name) != scenario_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid scenario name: {scenario_name}. Name should not contain path components.",
         )
 
 
@@ -557,17 +647,24 @@ async def put(config: CEAConfig, scenario: str, payload: Dict[str, Any]):
     """Update scenario"""
     scenario_path = secure_path(os.path.join(config.project, scenario))
     new_scenario_name: str = payload.get('name')
+
+    # Assume no operations done, return None
+    if new_scenario_name is None:
+        return None
+
+    scenario_name = os.path.normpath(new_scenario_name)
+    validate_scenario_name(scenario_name)
+
     try:
-        if new_scenario_name is not None:
-            new_path = secure_path(os.path.join(config.project, new_scenario_name))
-            os.rename(scenario_path, new_path)
-            if config.scenario_name == scenario:
-                config.scenario_name = new_scenario_name
-                if isinstance(config, CEADatabaseConfig):
-                    await config.save()
-                else:
-                    config.save()
-            return {'name': new_scenario_name}
+        new_path = secure_path(os.path.join(config.project, new_scenario_name))
+        os.rename(scenario_path, new_path)
+        if config.scenario_name == scenario:
+            config.scenario_name = new_scenario_name
+            if isinstance(config, CEADatabaseConfig):
+                await config.save()
+            else:
+                config.save()
+        return {'name': new_scenario_name}
     except OSError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -576,20 +673,91 @@ async def put(config: CEAConfig, scenario: str, payload: Dict[str, Any]):
         )
 
 
-@router.delete('/scenario/{scenario}', dependencies=[CEASeverDemoAuthCheck, Depends(check_scenario_exists)])
-async def delete(project_info: CEAProjectInfo, scenario: str):
+@router.delete('/', dependencies=[CEASeverDemoAuthCheck])
+async def delete_project(project_root: CEAProjectRoot, project_info: ProjectPath):
+    """Delete project"""
+    project_path = project_info.project
+    if project_root is not None and not project_path.startswith(project_root):
+        project_path = os.path.join(project_root, project_path)
+
+    project = secure_path(project_path)
+    if not os.path.exists(project):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Project does not exist.',
+        )
+
+    try:
+        # TODO: Check for any current open scenarios or jobs
+        shutil.rmtree(project)
+        return {'message': 'Project deleted', 'project': project_info.project}
+    except OSError as e:
+        traceback.print_exc()
+        logger.error(e)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Make sure that the project you are trying to delete is not open in any application. '
+                   'Try and refresh the page again.',
+        )
+
+@router.delete('/scenario', dependencies=[CEASeverDemoAuthCheck])
+async def delete_scenario(project_root: CEAProjectRoot, scenario_info: ScenarioPath):
     """Delete scenario from project"""
-    scenario_path = secure_path(os.path.join(project_info.project, scenario))
+    project_path = scenario_info.project
+    if project_root is not None and not project_path.startswith(project_root):
+        project_path = os.path.join(project_root, project_path)
+
+    project = secure_path(project_path)
+    scenario = scenario_info.scenario_name
+    validate_scenario_name(scenario)
+
+    scenario_path = secure_path(os.path.join(project, scenario))
+    if not os.path.exists(scenario_path):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Scenario does not exist.',
+        )
+
     try:
         # TODO: Check for any current open scenarios or jobs
         shutil.rmtree(scenario_path)
-        return {'scenarios': cea.config.get_scenarios_list(project_info.project)}
-    except OSError:
+        return {'scenarios': cea.config.get_scenarios_list(project)}
+    except OSError as e:
         traceback.print_exc()
+        logger.error(e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Make sure that the scenario you are trying to delete is not open in any application. '
                    'Try and refresh the page again.',
+        )
+
+
+
+@router.post('/scenario/{scenario}/duplicate', dependencies=[CEASeverDemoAuthCheck])
+async def duplicate_scenario(project_info: CEAProjectInfo, scenario: str, new_scenario_info: NewScenarioInfo):
+    """Duplicate Scenario"""
+    scenario_path = secure_path(os.path.join(project_info.project, scenario))
+
+    if not os.path.exists(scenario_path):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Scenario does not exist.',
+        )
+
+    new_scenario_name = new_scenario_info.name
+    validate_scenario_name(new_scenario_name)
+
+    new_path = secure_path(os.path.join(project_info.project, new_scenario_name))
+    try:
+        # TODO: Check for any current open scenarios or jobs
+        # TODO: Copy only necessary files
+        shutil.copytree(scenario_path, new_path)
+        return {'scenarios': cea.config.get_scenarios_list(project_info.project)}
+    except OSError as e:
+        logger.error(e)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Unable to duplicate scenario.',
         )
 
 

@@ -10,6 +10,7 @@ import cea.interfaces.dashboard.plots.routes as plots
 import cea.interfaces.dashboard.server as server
 from cea.interfaces.dashboard.lib.database.models import create_db_and_tables
 from cea.interfaces.dashboard.lib.database.session import close_db_connection
+from cea.interfaces.dashboard.lib.cache.provider import cleanup_cache_connections
 from cea.interfaces.dashboard.lib.logs import logger
 from cea.interfaces.dashboard.lib.socketio import socket_app
 from cea.interfaces.dashboard.settings import get_settings
@@ -30,6 +31,8 @@ async def lifespan(_: FastAPI):
     await server.shutdown_worker_processes()
     # Close database connections
     await close_db_connection()
+    # Close Redis connections if they exist
+    await cleanup_cache_connections()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -55,8 +58,9 @@ app.include_router(server.router, prefix='/server')
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    logger.error("Found validation errors:", exc.errors())
-    logger.error("url", request.url)
+    logger.error(f"Found validation errors: {exc.errors()}")
+    if request:
+        logger.error(f"request: {request}")
 
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

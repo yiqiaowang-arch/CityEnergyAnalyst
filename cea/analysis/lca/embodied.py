@@ -189,8 +189,7 @@ def lca_embodied(year_to_calculate, locator):
 
     # fix according to the void deck
     data_merged_df['empty_envelope_ratio'] = 1 - (
-            (data_merged_df['void_deck'] * (data_merged_df['height_ag'] / data_merged_df['floors_ag'])) / (
-            data_merged_df['area_walls_ext_ag'] + data_merged_df['windows_ag']))
+            (data_merged_df['void_deck']  / data_merged_df['floors_ag'])) # total area of external facade (wall+window)
     data_merged_df['windows_ag'] = data_merged_df['windows_ag'] * data_merged_df['empty_envelope_ratio']
     data_merged_df['area_walls_ext_ag'] = data_merged_df['area_walls_ext_ag'] * data_merged_df['empty_envelope_ratio']
 
@@ -209,6 +208,7 @@ def lca_embodied(year_to_calculate, locator):
 
     # export the results for embodied emissions (E_ghg_) and non-renewable primary energy (E_nre_pen_) for each
     # building, both total (in t CO2-eq. and GJ) and per square meter (in kg CO2-eq./m2 and MJ/m2)
+    locator.ensure_parent_folder_exists(locator.get_lca_embodied())
     result_emissions.to_csv(locator.get_lca_embodied(),
                             index=False,
                             float_format='%.2f', na_rep='nan')
