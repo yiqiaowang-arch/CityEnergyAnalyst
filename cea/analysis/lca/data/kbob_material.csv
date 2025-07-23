@@ -1,4 +1,4 @@
-﻿NameEnglish,NameGerman,IdKbob,IdDisposal,Disposal,Density,DensityUnit,UBPEmbodied,UBPEoL,TotalEmbodied,TotalEoL,RenewableEmbodied,RenewableEoL,NonRenewableEmbodied,NonRenewableEoL,GHGEmbodied,GHGEoL,ThermalCond
+﻿Name,NameGerman,IdKbob,IdDisposal,Disposal,Density,DensityUnit,UBPEmbodied,UBPEoL,TotalEmbodied,TotalEoL,RenewableEmbodied,RenewableEoL,NonRenewableEmbodied,NonRenewableEoL,GHGEmbodied,GHGEoL,ThermalCond
 "Excavation site security, Retaining wall, sprouted","Baugrubensicherung, Bohrpfahlwand, gespriesst",0.001,91.074,"Entsorgung, Baugrubensicherung, Bohrpfahlwand, gespriesst",NULL,m2,877000,130000,2120,268,101,9.57,2020,258,778,50.2,NULL
 "Excavation site security, pile wall, floating","Baugrubensicherung, Bohrpfahlwand, unverankert",0.002,91.075,"Entsorgung, Baugrubensicherung, Bohrpfahlwand, unverankert",NULL,m2,822000,130000,1910,268,84.8,9.57,1830,258,738,50.2,NULL
 "Excavation site security, pile wall anchored","Baugrubensicherung, Bohrpfahlwand, verankert",0.003,91.076,"Entsorgung, Baugrubensicherung, Bohrpfahlwand, verankert",NULL,m2,692000,86200,1410,177,76.4,6.32,1340,170,478,33.1,NULL

@@ -1,4 +1,4 @@
-NameEnglish,NameGerman,IdKbob,IdDisposal,Disposal,Size,Unit,UBPEmbodied,UBPEoL,TotalEmbodied,TotalEoL,RenewableEmbodied,RenewableEoL,NonRenewableEmbodied,NonRenewableEoL,GHGEmbodied,GHGEoL
+Name,NameGerman,IdKbob,IdDisposal,Disposal,Size,Unit,UBPEmbodied,UBPEoL,TotalEmbodied,TotalEoL,RenewableEmbodied,RenewableEoL,NonRenewableEmbodied,NonRenewableEoL,GHGEmbodied,GHGEoL
 "Heat generator, specific power demand 10 W/m2","Waermeerzeuger, spez. Leistungsbedarf 10 W/m2",31.001,92.006,"Entsorgung, Waermeerzeuger, spez. Leistungsbedarf 10 W/m2",EBF,m2,1190,10.6,2.5,0.02,0.24,0,2.26,0.02,0.5,0.01
 "Heat generator, specific power demand 30 W/m2","Waermeerzeuger, spez. Leistungsbedarf 30 W/m2",31.002,92.007,"Entsorgung, Waermeerzeuger, spez. Leistungsbedarf 30 W/m2",EBF,m2,3560,31.8,7.49,0.055,0.707,0.001,6.78,0.054,1.5,0.033
 "Heat generator, specific power demand 50 W/m2","Waermeerzeuger, spez. Leistungsbedarf 50 W/m2",31.003,92.008,"Entsorgung, Waermeerzeuger, spez. Leistungsbedarf 50 W/m2",EBF,m2,5930,53,12.5,0.092,1.18,0.002,11.3,0.091,2.5,0.055
