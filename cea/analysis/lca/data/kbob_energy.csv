@@ -1,4 +1,4 @@
-﻿NameEnglish,NameGerman,IdKbob,Size,Unit,UBP,PeTotal,PeRenewable,PeNonRenewable,PeRenewableAtLocation,GHG
+﻿Name,NameGerman,IdKbob,Size,Unit,UBP,PeTotal,PeRenewable,PeNonRenewable,PeRenewableAtLocation,GHG
 Heating oil EL, Heizoel EL,41.001,Endenergie,kWh,234,1.24,0.01,1.23,0,0.3
 Natural gas, Erdgas,41.002,Endenergie,kWh,137,1.07,0.004,1.06,0,0.228
 Propane / Butane, Propan/Buta,41.003,Endenergie,kWh,200,1.16,0.008,1.15,0,0.273
