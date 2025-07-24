@@ -40,7 +40,6 @@ def lca_embodied(year_to_calculate: int, locator: cea.inputlocator.InputLocator)
     zone_df = get_building_geometry(locator)
     architecture_df = pd.read_csv(locator.get_building_architecture())
     component_df = read_components(locator)
-    material_df = pd.read_csv(os.path.join(os.getcwd(), "data", "materials.csv"))
 
     return
 
@@ -67,13 +66,13 @@ def read_components(locator: cea.inputlocator.InputLocator) -> pd.DataFrame:
     """reads the composition of components from the database: 
     roof, wall, window, base, floor, partition.
     They are read separately from different files and output to one single dataframe.
+    The dataframe contains only two columns:
+    - code: the code of the component, e.g. "ROOF_AS1"
+    - component_emission_area_density_kgCO2m2: the embodied emission of the component in kgCO2/m2
 
     :param locator: the cea locator object
     :type locator: cea.inputlocator.InputLocator
-    :return: one dataframe containing all types of component construction. 
-        For each construction, one or more rows of materials, 
-        as well as their thickness and emission intensity in different phases 
-        are stored as separate columns.
+    :return: one dataframe containing all types of components and their embodied emissions in kgCO2/m2.
     :rtype: pd.DataFrame
     """
     roofs = pd.read_csv(locator.get_database_assemblies_envelope_roof())
@@ -81,8 +80,26 @@ def read_components(locator: cea.inputlocator.InputLocator) -> pd.DataFrame:
     windows = pd.read_csv(locator.get_database_assemblies_envelope_window())
     floors = pd.read_csv(locator.get_database_assemblies_envelope_floor())
     # add all components together to a long dataframe
-    
+    opaques = pd.concat([roofs, walls, floors], ignore_index=True)
 
+    material_df = pd.read_csv(os.path.join(locator.get_db4_lca_folder(), "material.csv"))
+
+    # 2. calculate the embodied emissions of building components
+    opaques_aug = opaques.merge(material_df, on="Name", how="left")
+    opaques_aug = opaques_aug.assign(
+        material_emission_area_density_kgCO2m2=lambda d: d['GHGEmbodied'] * d['Density'] * d['thickness_m'], # kgCO2/kg * kg/m3 * m = kgCO2/m2
+    )
+
+    opaques_clean = opaques_aug.groupby('code').agg(
+        component_emission_area_density_kgCO2m2=('material_emission_area_density_kgCO2m2', 'sum')
+    ).reset_index()
+
+    windows_clean = windows[["code", "GHG_win_kgCO2m2"]].rename(
+        columns={"GHG_win_kgCO2m2": "component_emission_area_density_kgCO2m2"}
+    ).drop_duplicates()
+
+    components_clean = pd.concat([opaques_clean, windows_clean], ignore_index=True)
+    return components_clean
 
 def main(config: "cea.config.Configuration") -> None:  # pragma: no cover
     assert os.path.exists(config.scenario), f"Scenario not found: {config.scenario}"
