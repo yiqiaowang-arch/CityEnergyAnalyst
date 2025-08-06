@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import pathlib
@@ -5,23 +6,23 @@ import shutil
 import traceback
 import warnings
 from collections import defaultdict
+from contextlib import redirect_stdout
 from typing import Dict, Any
 
 import geopandas
 import pandas as pd
 from fastapi import APIRouter, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from fiona.errors import DriverError
 from pydantic import BaseModel, Field
-from fastapi.concurrency import run_in_threadpool
 
 import cea.config
 import cea.inputlocator
 import cea.schemas
-import cea.scripts
-import cea.utilities.dbf
+from cea.databases import CEADatabase
 from cea.datamanagement.databases_verification import InputFileValidator
 from cea.datamanagement.format_helper.cea4_verify_db import cea4_verify_db
-from cea.interfaces.dashboard.api.databases import read_all_databases, DATABASES_SCHEMA_KEYS
+from cea.interfaces.dashboard.api.databases import DATABASES_SCHEMA_KEYS
 from cea.interfaces.dashboard.dependencies import CEAProjectInfo, CEASeverDemoAuthCheck
 from cea.interfaces.dashboard.utils import secure_path
 from cea.plots.supply_system.a_supply_system_map import get_building_connectivity, newer_network_layout_exists
@@ -144,6 +145,7 @@ async def get_all_inputs(project_info: CEAProjectInfo):
         store['schedules'] = {}
 
         return store
+
     return await run_in_threadpool(fn)
 
 
@@ -218,8 +220,8 @@ async def save_all_inputs(project_info: CEAProjectInfo, form: InputForm):
                 schedule_dict = schedules[building]
                 schedule_path = locator.get_building_weekly_schedules(building)
                 schedule_data = schedule_dict['SCHEDULES']
-                schedule_complementary_data = {'MONTHLY_MULTIPLIER': schedule_dict['MONTHLY_MULTIPLIER'],
-                                               'METADATA': schedule_dict['METADATA']}
+                # schedule_complementary_data = {'MONTHLY_MULTIPLIER': schedule_dict['MONTHLY_MULTIPLIER'],
+                #                                'METADATA': schedule_dict['METADATA']}
                 data = pd.DataFrame()
                 for day in ['WEEKDAY', 'SATURDAY', 'SUNDAY']:
                     df = pd.DataFrame({'HOUR': range(1, 25), 'DAY': [day] * 24})
@@ -247,6 +249,9 @@ def get_building_properties(scenario: str):
         # Get building property data from file
         try:
             if file_type == 'shp':
+                if not os.path.exists(file_path):
+                    raise FileNotFoundError(f"File not found: {file_path}")
+
                 table_df = geopandas.read_file(file_path)
                 table_df = pd.DataFrame(
                     table_df.drop(columns='geometry'))
@@ -261,7 +266,7 @@ def get_building_properties(scenario: str):
                 if 'reference' in db_columns and 'reference' not in table_df.columns:
                     table_df['reference'] = None
                 store['tables'][db] = table_df.set_index("name").to_dict(orient='index')
-        except (IOError, DriverError, ValueError) as e:
+        except (IOError, DriverError, ValueError, FileNotFoundError) as e:
             print(f"Error reading {db} from {file_path}: {e}")
             # Continue to try getting column definitions
             store['tables'][db] = None
@@ -348,6 +353,10 @@ def df_to_json(file_location):
     from cea.utilities.standardize_coordinates import get_lat_lon_projected_shapefile, get_projected_coordinate_system
 
     try:
+        file_location = secure_path(file_location)
+        if not os.path.exists(file_location):
+            raise FileNotFoundError(f"File not found: {file_location}")
+
         table_df = geopandas.GeoDataFrame.from_file(file_location)
         # Save coordinate system
         if table_df.empty:
@@ -364,7 +373,7 @@ def df_to_json(file_location):
         out = table_df.to_crs(get_geographic_coordinate_system())
         out = json.loads(out.to_json())
         return out, crs
-    except (IOError, DriverError) as e:
+    except (IOError, DriverError, FileNotFoundError) as e:
         print(e)
         return None, None
     except Exception:
@@ -395,7 +404,7 @@ async def get_building_schedule(project_info: CEAProjectInfo, building: str):
 async def get_input_database_data(project_info: CEAProjectInfo):
     locator = cea.inputlocator.InputLocator(project_info.scenario)
     try:
-        return await run_in_threadpool(lambda: read_all_databases(locator.get_databases_folder()))
+        return await run_in_threadpool(lambda: CEADatabase(locator).to_dict())
     except IOError as e:
         print(e)
         raise HTTPException(
@@ -446,26 +455,32 @@ async def copy_input_database(project_info: CEAProjectInfo, database_path: Datab
     return {'message': 'Database copied to {}'.format(copy_path)}
 
 
+# Move to database route
 @router.get('/databases/check')
 async def check_input_database(project_info: CEAProjectInfo):
     """Check if the databases are valid"""
     scenario = project_info.scenario
-    dict_missing_db = cea4_verify_db(scenario, verbose=True)
 
-    if dict_missing_db:
-        missing_dbs = list(dict_missing_db.keys())
-        missing_dbs.sort()
+    # Redirect stdout to variable to capture output
+    buf = io.StringIO()
+    try:
+        with redirect_stdout(buf):
+            dict_missing_db = cea4_verify_db(scenario, verbose=True)
+        output = buf.getvalue()
+    finally:
+        buf.close()
+
+    if any(len(missing_files) > 0 for missing_files in dict_missing_db.values()):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail= json.dumps(dict_missing_db),
+            detail=output,
         )
 
-    return {'message': 'Database in path seems to be valid.'}
+    return {'message': True}
 
 
 @router.get("/databases/validate")
 async def validate_input_database(project_info: CEAProjectInfo):
-    import cea.scripts
     locator = cea.inputlocator.InputLocator(project_info.scenario)
     # TODO: Add plugin support
     schemas = cea.schemas.schemas(plugins=[])
@@ -524,7 +539,8 @@ def database_dict_to_file(db_dict, csv_path):
                 merged_df = df
             else:
                 merge_column = "code" if "code" in df.columns and "code" in merged_df.columns else None
-                merged_df = pd.merge(merged_df, df, on=merge_column, how="outer") if merge_column else pd.concat([merged_df, df], axis=1)
+                merged_df = pd.merge(merged_df, df, on=merge_column, how="outer") if merge_column else pd.concat(
+                    [merged_df, df], axis=1)
 
         if merged_df is not None and not merged_df.empty:
             # Ensure output directory exists
