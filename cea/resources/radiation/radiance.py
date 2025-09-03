@@ -11,6 +11,7 @@ import numpy as np
 
 from cea.resources.radiation.geometry_generator import BuildingGeometry
 from py4design.py3dmodel.fetch import points_frm_occface
+from typing import Literal
 
 
 class SensorOutputUnit(Enum):
@@ -253,8 +254,12 @@ class DaySimProject(object):
     def cleanup_project(self):
         shutil.rmtree(self.project_path)
 
-    def create_sensor_input_file(self, sensor_positions, sensor_normals,
-                                 sensor_output_unit: SensorOutputUnit = SensorOutputUnit.w_m2):
+    def create_sensor_input_file(
+        self,
+        sensor_positions: list[tuple[float, float, float]],
+        sensor_normals: list[tuple[float, float, float]],
+        sensor_output_unit: Literal[1, 2] = SensorOutputUnit.w_m2,
+    ) -> None:
         """
         Creates sensor input file and writes its location to the header file
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from typing import Optional, Tuple, NamedTuple, TYPE_CHECKING
+from typing import Literal, Optional, NamedTuple, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -27,6 +27,7 @@ from cea.resources.utils import get_radiation_bin_path
 if TYPE_CHECKING:
     from cea.inputlocator import InputLocator
     from cea.resources.radiation.radiance import CEADaySim
+    from OCC.Core.TopoDS import TopoDS_Face, TopoDS_Solid
 
 BUILT_IN_BINARIES_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "bin")
 REQUIRED_BINARIES = {"ds_illum", "epw2wea", "gen_dc", "oconv", "radfiles2daysim", "rtrace_dc"}
@@ -38,7 +39,7 @@ class GridSize(NamedTuple):
     walls: int
 
 
-def check_daysim_bin_directory(path_hint: Optional[str] = None) -> Tuple[str, Optional[str]]:
+def check_daysim_bin_directory(path_hint: Optional[str] = None) -> tuple[str, str | None]:
     """
     Check for the Daysim bin directory based on ``path_hint`` and return it on success.
 
@@ -138,52 +139,111 @@ def create_sensor_input_file(rad, chunk_n):
     rad.sensor_file_path = sensor_file_path
 
 
-def generate_sensor_surfaces(occface, grid_size, srf_type, orientation, normal, intersection):
+def generate_sensor_surfaces(
+    occface: TopoDS_Face,
+    grid_size: int,
+    srf_type: str,
+    orientation: str,
+    normal: tuple[float, float, float],
+    intersection: Literal[0, 1],
+):
+    """Generate sensor grids from a given surface and the grid size. 
+    It triangulates the surface into a list of smaller faces, and each sensor sits on
+    the midpoint of these faces.
+    Note that the sensor grid is offset from the surface to the outside by 0.01 m.
+
+    It also generates corresponding attributes of sensors, stored in lists as output.
+
+    :param occface: The OCC face to generate sensors from
+    :type occface: TopoDS_Face
+    :param grid_size: The size of the grid for the sensors
+    :type grid_size: int
+    :param srf_type: The type of the surface (can be `roofs`, `walls`, `windows`, `undersides`)
+    :type srf_type: str
+    :param orientation: The orientation of the surface. 
+        Could be `east`/`west`/`north`/`south`/`top`/`bottom`, see geometry_generator.py line 498-509.
+    :type orientation: str
+    :param normal: The normal vector of the surface.`
+    :type normal: tuple[float, float, float]
+    :param intersection: If the sensor intersects with the surface. 1 indicates interaction
+    :type intersection: Literal[0, 1]
+    :return: tuple of 6 lists. List lengths equal to the amount of sensors that are generated from the current face.
+    
+        1. `list[tuple[float, float, float]]`: sensor's normal directions (equal to face's normal direction)
+        2. `list[tuple[float, float, float]]`: sensor's coordinates (midpoint of subdivided faces from the original face)
+        3. `list[str]`: types of surfaces where sensors are located (list of surface types, same as input `srf_type`)
+        4. `list[float]`: subsurface's area where sensor sits as midpoint. If sensor intersects, the subsurface's area sets back to 0.
+        5. `list[str]`: sensor's orientation (list of surface orientations, same as input `orientation`)
+        6. `list[Literal[0, 1]]`: sensor's intersections with the surface (1 if intersects, 0 otherwise, same as input `intersection`)
+    :rtype: tuple[list[tuple[float, float, float]], list[tuple[float, float, float]], list[str], list[float], list[str], list[Literal[0, 1]]]
+    """
     mid_pt = py3dmodel.calculate.face_midpt(occface)
     location_pt = py3dmodel.modify.move_pt(mid_pt, normal, 0.01)
-    moved_oface = py3dmodel.fetch.topo2topotype(py3dmodel.modify.move(mid_pt, location_pt, occface))
-
+    moved_oface: TopoDS_Face = py3dmodel.fetch.topo2topotype(py3dmodel.modify.move(mid_pt, location_pt, occface))
     # put it into occ and subdivide surfaces
-    sensor_surfaces = py3dmodel.construct.grid_face(moved_oface, grid_size, grid_size)
+    sensor_surfaces: list[TopoDS_Face] = py3dmodel.construct.grid_face(moved_oface, grid_size, grid_size)
+    ls_length = len(sensor_surfaces)
 
     # calculate list of properties per surface
-    sensor_intersection = [intersection for x in sensor_surfaces]
-    sensor_dir = [normal for x in sensor_surfaces]
+    sensor_intersection : list[Literal[0, 1]] = [intersection] * ls_length
+    sensor_direction = [normal] * ls_length
     sensor_cord = [py3dmodel.calculate.face_midpt(x) for x in sensor_surfaces]
-    sensor_type = [srf_type for x in sensor_surfaces]
-    sensor_orientation = [orientation for x in sensor_surfaces]
+    sensor_type = [srf_type] * ls_length
+    sensor_orientation = [orientation] * ls_length
     sensor_area = [py3dmodel.calculate.face_area(x) * (1.0 - scalar)
                    for x, scalar in zip(sensor_surfaces, sensor_intersection)]
 
-    return sensor_dir, sensor_cord, sensor_type, sensor_area, sensor_orientation, sensor_intersection
+    return sensor_direction, sensor_cord, sensor_type, sensor_area, sensor_orientation, sensor_intersection
 
 
 def calc_sensors_building(building_geometry: BuildingGeometry, grid_size: GridSize):
-    sensor_dir_list = []
-    sensor_cord_list = []
-    sensor_type_list = []
-    sensor_area_list = []
-    sensor_orientation_list = []
-    sensor_intersection_list = []
+    """Generates sensors for a building.
+
+    :param building_geometry: BuildingGeometry data, containing surface information
+    :type building_geometry: BuildingGeometry
+    :param grid_size: GridSize data, containing grid size information for roof and walls.
+    :type grid_size: GridSize
+    :return: A tuple containing lists of sensor properties.
+
+        1. `list[tuple[float, float, float]]`: sensor's normal directions
+        2. `list[tuple[float, float, float]]`: sensor's coordinates
+        3. `list[str]`: sensor's surface types
+        4. `list[float]`: sensor's areas
+        5. `list[str]`: sensor's orientations
+        6. `list[Literal[0, 1]]`: sensor's intersections
+    :rtype: tuple[list[tuple[float, float, float]], list[tuple[float, float, float]], list[str], list[float], list[str], list[Literal[0, 1]]]
+    """
+    sensor_dir_list: list[tuple[float, float, float]] = []
+    sensor_cord_list: list[tuple[float, float, float]] = []
+    sensor_type_list: list[str] = []
+    sensor_area_list: list[float] = []
+    sensor_orientation_list: list[str] = []
+    sensor_intersection_list: list[Literal[0, 1]] = []
 
     for srf_type in SURFACE_TYPES:
-        occface_list = getattr(building_geometry, srf_type)
-        orientation_list = getattr(building_geometry, "orientation_{srf_type}".format(srf_type=srf_type))
-        normals_list = getattr(building_geometry, "normals_{srf_type}".format(srf_type=srf_type))
-        interesection_list = getattr(building_geometry, "intersect_{srf_type}".format(srf_type=srf_type))
-        for orientation, normal, face, intersection in zip(orientation_list, normals_list, occface_list,
-                                                           interesection_list):
-            sensor_dir, \
-                sensor_cord, \
-                sensor_type, \
-                sensor_area, \
-                sensor_orientation, \
-                sensor_intersection = generate_sensor_surfaces(face,
-                                                               grid_size.roof if srf_type == "roofs" else grid_size.walls,
-                                                               srf_type,
-                                                               orientation,
-                                                               normal,
-                                                               intersection)
+        occface_list: list[TopoDS_Face] = getattr(building_geometry, srf_type)
+        orientation_list: list[str] = getattr(building_geometry, "orientation_{srf_type}".format(srf_type=srf_type))
+        normals_list: list[tuple[float, float, float]] = getattr(building_geometry, "normals_{srf_type}".format(srf_type=srf_type))
+        interesection_list: list[Literal[0, 1]] = getattr(building_geometry, "intersect_{srf_type}".format(srf_type=srf_type))
+
+        for orientation, normal, face, intersection in zip(
+            orientation_list, normals_list, occface_list, interesection_list
+        ):
+            (
+                sensor_dir,
+                sensor_cord,
+                sensor_type,
+                sensor_area,
+                sensor_orientation,
+                sensor_intersection,
+            ) = generate_sensor_surfaces(
+                face,
+                grid_size.roof if srf_type == "roofs" else grid_size.walls,
+                srf_type,
+                orientation,
+                normal,
+                intersection,
+            )
             sensor_intersection_list.extend(sensor_intersection)
             sensor_dir_list.extend(sensor_dir)
             sensor_cord_list.extend(sensor_cord)
@@ -194,22 +254,58 @@ def calc_sensors_building(building_geometry: BuildingGeometry, grid_size: GridSi
     return sensor_dir_list, sensor_cord_list, sensor_type_list, sensor_area_list, sensor_orientation_list, sensor_intersection_list
 
 
-def calc_sensors_zone(building_names, locator, grid_size: GridSize, geometry_pickle_dir):
-    sensors_coords_zone = []
-    sensors_dir_zone = []
-    sensors_total_number_list = []
-    names_zone = []
-    sensors_code_zone = []
-    sensor_intersection_zone = []
+def calc_sensors_zone(
+    building_names: list[str],
+    locator: InputLocator,
+    grid_size: GridSize,
+    geometry_pickle_dir: str,
+) -> tuple[
+    list[tuple[float, float, float]],
+    list[tuple[float, float, float]],
+    list[int],
+    list[str],
+    list[list[str]],
+    list[list[Literal[0, 1]]],
+]:
+    """Calculate sensor properties for a district of buildings.
+
+    :param building_names: List of building names in the district.
+    :type building_names: list[str]
+    :param locator: Inputlocator for file paths.
+    :type locator: InputLocator
+    :param grid_size: GridSize object. Has two integer attributes: roof and walls.
+    :type grid_size: GridSize
+    :param geometry_pickle_dir: Directory where the geometry pickle files are stored. 
+        Typically: `scenario/outputs/data/solar-radiation/radiance_geometry_pickle`
+    :type geometry_pickle_dir: str
+    :return: a tuple of 6 lists containing district's sensors properties.
+
+        1. `list[tuple[float, float, float]]`: sensor's coordinates for all buildings, flattened
+        2. `list[tuple[float, float, float]]`: sensor's normal directions for all buildings, flattened
+        3. `list[int]`: numbers of sensors of all buildings
+        4. `list[str]`: building names
+        5. `list[list[str]]`: sensor codes for all buildings. Each building's sensors are in its own sublist
+        6. `list[list[Literal[0, 1]]]`: sensor intersection flags for all buildings. 1 if sensor touches adjacent buildings, 0 otherwise.
+            Each building's sensors are in its own sublist
+    :rtype: tuple[list[tuple[float, float, float]], list[tuple[float, float, float]], list[int], list[str], list[list[str]], list[list[Literal[0, 1]]]]
+    """
+    sensors_coords_zone: list[tuple[float, float, float]] = []
+    sensors_dir_zone: list[tuple[float, float, float]] = []
+    sensors_total_number_list: list[int] = []
+    names_zone: list[str] = []
+    sensors_code_zone: list[list[str]] = []
+    sensor_intersection_zone: list[list[Literal[0, 1]]] = []
     for building_name in building_names:
         building_geometry = BuildingGeometry.load(os.path.join(geometry_pickle_dir, 'zone', building_name))
         # get sensors in the building
-        sensors_dir_building, \
-            sensors_coords_building, \
-            sensors_type_building, \
-            sensors_area_building, \
-            sensor_orientation_building, \
-            sensor_intersection_building = calc_sensors_building(building_geometry, grid_size)
+        (
+            sensors_dir_building,
+            sensors_coords_building,
+            sensors_type_building,
+            sensors_area_building,
+            sensor_orientation_building,
+            sensor_intersection_building,
+        ) = calc_sensors_building(building_geometry, grid_size)
 
         # get the total number of sensors and store in lst
         sensors_number = len(sensors_coords_building)
@@ -247,21 +343,23 @@ def calc_sensors_zone(building_names, locator, grid_size: GridSize, geometry_pic
     return sensors_coords_zone, sensors_dir_zone, sensors_total_number_list, names_zone, sensors_code_zone, sensor_intersection_zone
 
 
-def isolation_daysim(chunk_n, cea_daysim: CEADaySim, building_names, locator, radiance_parameters, write_sensor_data,
+def isolation_daysim(chunk_n, cea_daysim: CEADaySim, building_names: list[str], locator: InputLocator, radiance_parameters, write_sensor_data: bool,
                      grid_size: GridSize,
-                     max_global, weatherfile, geometry_pickle_dir):
+                     max_global, weatherfile, geometry_pickle_dir: str):
     # initialize daysim project
     daysim_project = cea_daysim.initialize_daysim_project('chunk_{n}'.format(n=chunk_n))
     print('Creating daysim project in: {daysim_dir}'.format(daysim_dir=daysim_project.project_path))
 
     # calculate sensors
     print("Calculating and sending sensor points")
-    sensors_coords_zone, \
-        sensors_dir_zone, \
-        sensors_number_zone, \
-        names_zone, \
-        sensors_code_zone, \
-        sensor_intersection_zone = calc_sensors_zone(building_names, locator, grid_size, geometry_pickle_dir)
+    (
+        sensors_coords_zone,
+        sensors_dir_zone,
+        sensors_number_zone,
+        names_zone,
+        sensors_code_zone,
+        sensor_intersection_zone,
+    ) = calc_sensors_zone(building_names, locator, grid_size, geometry_pickle_dir)
 
     daysim_project.create_sensor_input_file(sensors_coords_zone, sensors_dir_zone)
 
