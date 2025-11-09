@@ -1,7 +1,6 @@
-
-
-
 import os
+
+import geopandas as gpd
 
 import cea.config
 import cea.inputlocator
@@ -28,30 +27,41 @@ def layout_network(network_layout, locator, plant_building_names=None, output_na
     temp_path_potential_network_shp = locator.get_temporary_file("potential_network.shp")  # shapefile, location of output.
     temp_path_building_centroids_shp = locator.get_temporary_file("nodes_buildings.shp")
 
-    type_mat_default = network_layout.type_mat
+    # type_mat_default = network_layout.type_mat
+    type_mat_default = TYPE_MAT_DEFAULT
     pipe_diameter_default = network_layout.pipe_diameter
     type_network = network_layout.network_type
     list_district_scale_buildings = network_layout.connected_buildings
     consider_only_buildings_with_demand = network_layout.consider_only_buildings_with_demand
-    allow_looped_networks = network_layout.allow_looped_networks
+    # allow_looped_networks = network_layout.allow_looped_networks
+    allow_looped_networks = False
     steiner_algorithm = network_layout.algorithm
 
     path_streets_shp = locator.get_street_network()  # shapefile with the stations
     path_zone_shp = locator.get_zone_geometry()
 
     # Calculate points where the substations will be located (building centroids)
-    building_centroids_df = calc_building_centroids(path_zone_shp,
-                                                    temp_path_building_centroids_shp,
-                                                    list_district_scale_buildings,
-                                                    plant_building_names,
-                                                    consider_only_buildings_with_demand,
-                                                    type_network,
-                                                    total_demand_location)
+    building_centroids_df = calc_building_centroids(
+        path_zone_shp,
+        list_district_scale_buildings,
+        plant_building_names,
+        consider_only_buildings_with_demand,
+        type_network,
+        total_demand_location,
+    )
+    
+    street_network_df = gpd.GeoDataFrame.from_file(path_streets_shp)
 
     # Calculate potential network
-    crs_projected = calc_connectivity_network(path_streets_shp,
-                                              building_centroids_df,
-                                              path_potential_network=temp_path_potential_network_shp)
+    potential_network_df = calc_connectivity_network(street_network_df, building_centroids_df)
+    potential_network_df.to_file(temp_path_potential_network_shp, driver='ESRI Shapefile')
+    crs_projected = potential_network_df.crs
+
+    if crs_projected is None:
+        raise ValueError("The CRS of the potential network shapefile is undefined. Please check if the input street network has a defined projection system.")
+
+    # Save building centroids with projected crs
+    building_centroids_df.to_crs(crs_projected).to_file(temp_path_building_centroids_shp, driver='ESRI Shapefile')
 
     # calc minimum spanning tree and save results to disk
     path_output_edges_shp = locator.get_network_layout_edges_shapefile(type_network, output_name_network)
@@ -103,7 +113,7 @@ class NetworkLayout(object):
                 setattr(self, attr, getattr(network_layout, attr))
 
 
-def main(config):
+def main(config: cea.config.Configuration):
     assert os.path.exists(config.scenario), 'Scenario not found: %s' % config.scenario
     locator = cea.inputlocator.InputLocator(scenario=config.scenario)
     network_layout = NetworkLayout(network_layout=config.network_layout)

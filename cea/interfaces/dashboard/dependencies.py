@@ -20,7 +20,7 @@ from cea.interfaces.dashboard.lib.database.models import LOCAL_USER_ID, Project,
 from cea.interfaces.dashboard.lib.database.session import SessionDep, get_session_context
 from cea.interfaces.dashboard.lib.database.settings import database_settings
 from cea.interfaces.dashboard.lib.logs import logger, getCEAServerLogger
-from cea.interfaces.dashboard.settings import get_settings
+from cea.interfaces.dashboard.settings import Settings, get_settings, LimitSettings
 from cea.plots.cache import PlotCache
 
 IGNORE_CONFIG_SECTIONS = {"server", "development", "schemas"}
@@ -210,11 +210,13 @@ async def get_plot_cache(config: CEAConfig):
 
 
 async def get_worker_processes() -> AsyncDictCache:
-    return await get_dict_cache("worker_processes")
+    from cea.interfaces.dashboard.lib.cache.settings import WORKER_PROCESS_TTL
+    return await get_dict_cache("worker_processes", default_ttl=WORKER_PROCESS_TTL)
 
 
 async def get_streams() -> AsyncDictCache:
-    return await get_dict_cache("streams")
+    from cea.interfaces.dashboard.lib.cache.settings import STREAM_CACHE_TTL
+    return await get_dict_cache("streams", default_ttl=STREAM_CACHE_TTL)
 
 
 def get_server_url():
@@ -263,7 +265,14 @@ def get_user(auth_client: CEAAuthClient) -> Dict[str, str]:
     # Try to get user id from request cookie
     if auth_client is not None:
         try:
-            return auth_client.get_current_user()
+            user = auth_client.get_current_user()
+            if user.get("client_read_only_metadata") is None:
+                user["onboarded"] = False
+                user["pro_user"] = False
+            else:
+                user["onboarded"] = user['client_read_only_metadata'].get("onboarded", False)
+                user["pro_user"] = user['client_read_only_metadata'].get("pro_user", False)
+            return user
         except CEAAuthError as e:
             logger.error(e)
             raise HTTPException(
@@ -301,6 +310,18 @@ def check_auth_for_demo(request: Request, user_id: CEAUserID):
             detail="Unauthorized",
         )
 
+def get_limits(user: CEAUser) -> LimitSettings:
+    # TODO: Shift limits to user properties
+    limits = LimitSettings()
+
+    # Pro users get 3x the limits and 5 scenarios
+    if user.get("pro_user", False):
+        limits.num_projects = limits.num_projects * 3 if limits.num_projects else None
+        limits.num_scenarios = 5
+        limits.num_buildings = limits.num_buildings * 3 if limits.num_buildings else None
+
+    return limits
+
 
 CEAUserID = Annotated[str, Depends(get_user_id)]
 CEAUser = Annotated[dict, Depends(get_user)]
@@ -312,7 +333,8 @@ CEAWorkerProcesses = Annotated[AsyncDictCache, Depends(get_worker_processes)]
 CEAStreams = Annotated[AsyncDictCache, Depends(get_streams)]
 CEAServerUrl = Annotated[str, Depends(get_server_url)]
 CEAProjectRoot = Annotated[Optional[str], Depends(get_project_root)]
-CEAServerSettings = Annotated[dict, Depends(get_settings)]
+CEAServerSettings = Annotated[Settings, Depends(get_settings)]
 CEAAuthClient = Annotated[AuthClient, Depends(get_auth_client)]
+CEAServerLimits = Annotated[LimitSettings, Depends(get_limits)]
 
 CEASeverDemoAuthCheck = Depends(check_auth_for_demo)
