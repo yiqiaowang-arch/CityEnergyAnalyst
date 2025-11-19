@@ -36,6 +36,7 @@ class Configuration:
     emissions: EmissionsSection
     extract_reference_case: ExtractReferenceCaseSection
     solar: SolarSection
+    PV_offset: PvOffsetSection
     dbf_tools: DbfToolsSection
     to_rhino_gh: ToRhinoGhSection
     from_rhino_gh: FromRhinoGhSection
@@ -133,6 +134,8 @@ class Configuration:
     def __getattr__(self, item: Literal["extract_reference_case"]) -> ExtractReferenceCaseSection: ...
     @overload
     def __getattr__(self, item: Literal["solar"]) -> SolarSection: ...
+    @overload
+    def __getattr__(self, item: Literal["PV_offset"]) -> PvOffsetSection: ...
     @overload
     def __getattr__(self, item: Literal["dbf_tools"]) -> DbfToolsSection: ...
     @overload
@@ -629,6 +632,20 @@ class SolarSection(Section):
     def __getattr__(self, item: Literal["panel_tilt_angle"]) -> float: ...
     @overload
     def __getattr__(self, item: Literal["buildings"]) -> list[str]: ...
+    def __getattr__(self, item: str) -> Any: ...
+
+class PvOffsetSection(Section):
+    """Typed section for PV-offset configuration"""
+    buildings: list[str]
+    pv_codes: list[str]
+    pv_offset_allowance: list[str]
+
+    @overload
+    def __getattr__(self, item: Literal["buildings"]) -> list[str]: ...
+    @overload
+    def __getattr__(self, item: Literal["pv_codes"]) -> list[str]: ...
+    @overload
+    def __getattr__(self, item: Literal["pv_offset_allowance"]) -> list[str]: ...
     def __getattr__(self, item: str) -> Any: ...
 
 class DbfToolsSection(Section):
