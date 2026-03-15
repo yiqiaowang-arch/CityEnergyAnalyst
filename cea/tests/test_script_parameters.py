@@ -42,6 +42,19 @@ class TestScriptParameters(unittest.TestCase):
                     error_msg += f"  - '{param}' appears in sections: {' '.join(sections)}\n"
             self.fail(error_msg)
 
+    def test_state_simulations_only_exposes_wrapper_parameters(self):
+        """Check that state-simulations only exposes its own wrapper parameters."""
+        config = cea.config.Configuration()
+        state_simulations_script = next(
+            script for script in cea.scripts.list_scripts(config.plugins)
+            if script.name == "state-simulations"
+        )
+
+        self.assertEqual(
+            state_simulations_script.parameters,
+            ["general:scenario", "state-simulations:existing-timeline-name"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

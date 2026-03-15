@@ -62,6 +62,15 @@ class TestConfiguration(unittest.TestCase):
         self.assertEqual(os.path.normcase(os.path.expanduser(config.create_new_scenario.zone)),
                          os.path.normcase(os.path.expanduser(expected_output)))
 
+    def test_subfolder_choice_parameter_handles_missing_timeline_folder(self):
+        config = cea.config.Configuration()
+        with tempfile.TemporaryDirectory() as scenario:
+            config.scenario = scenario
+            parameter = config.district_events_apply_changes.parameters['existing-timeline-name']
+
+            self.assertEqual(parameter._choices, [])
+            self.assertEqual(parameter.get(), "")
+
 
 if __name__ == "__main__":
     unittest.main()

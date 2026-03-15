@@ -75,7 +75,8 @@ def decode(self, value):
 
 ```python
 class DynamicChoiceParameter(ChoiceParameter):
-    def initialize(self, parser):
+    def __init__(self, name, section, config):
+        super().__init__(name, section, config)
         self.depends_on = ['other-param']  # Declare dependencies
 
     @property
@@ -91,6 +92,23 @@ class DynamicChoiceParameter(ChoiceParameter):
         # Return list of valid choices
         return self._scan_resources()
 ```
+
+## UI Type Signalling
+
+- Use a distinct `Parameter` subclass when the GUI needs custom rendering for a specific field type.
+- Example: `StandardMultiChoiceParameter(ColumnMultiChoiceParameter)` keeps existing column multi-choice behaviour while exposing a unique `type` string to dashboard clients.
+- In `default.config`, set `.type = StandardMultiChoiceParameter` only for selectors that should be rendered with construction-standard-specific UI behaviour.
+
+## Scripts Registry
+
+- Keep `scripts.yml` descriptions aligned with the script's real execution order, especially wrapper scripts that orchestrate multiple internal steps.
+- Example: `state-simulations` must document its conditional Step 4 sequence explicitly (`network-layout` -> `thermal-network` -> `emissions` last), not just the base simulations.
+- When a wrapper script conditionally swaps internal engines or skips optional steps, document those runtime branches too.
+- Example: `state-simulations` can switch `radiation` to `radiation-crax` for no-void-deck states and skip `photovoltaic` when emissions ignore PV.
+- If a wrapper delegates membership or service granularity back to an underlying script, document that ownership explicitly.
+- Example: `state-simulations` lets `network-layout` read district building membership and DH service granularity from each state's `supply.csv` instead of re-owning those settings.
+- When an orchestration script grows beyond one concern, move the runtime logic into a package and point `scripts.yml` at the real entry module instead of keeping a legacy wrapper file.
+- Wrapper scripts should not re-expose settings already owned by underlying script sections unless there is a deliberate override policy.
 
 ## Validation Helpers
 
