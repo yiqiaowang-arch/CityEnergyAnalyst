@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 from dataclasses import dataclass
@@ -18,8 +19,14 @@ from cea.technologies.network_layout.plant_node_operations import (
     DEFAULT_SERVICES
 )
 from cea.technologies.network_layout.substations_location import calc_building_centroids
-from cea.technologies.network_layout.graph_utils import normalize_gdf_geometries, normalize_geometry
-from cea.optimization_new.user_network_loader import load_user_defined_network
+from cea.technologies.network_layout.graph_utils import (
+    gdf_to_nx,
+    normalize_coords,
+    normalize_gdf_geometries,
+    normalize_geometry,
+    nx_to_gdf,
+)
+from cea.optimization_new.user_network_loader import filter_network_to_buildings, load_user_defined_network
 
 __author__ = "Jimeno A. Fonseca"
 __copyright__ = "Copyright 2017, Architecture and Building Systems - ETH Zurich"
@@ -579,6 +586,104 @@ def print_demand_warning(buildings_without_demand, service_name):
         if len(buildings_without_demand) > 10:
             print(f"      ... and {len(buildings_without_demand) - 10} more")
         print("  Note: These buildings will be included in layout but may not be simulated in thermal-network")
+
+
+def save_dh_building_services_metadata(output_nodes_path, network_name, itemised_dh_services,
+                                       per_building_services_dh, overwrite_supply, nodes_gdf):
+    """Persist per-building DH service metadata next to `nodes.shp` when supply settings drive the layout."""
+    if overwrite_supply or not per_building_services_dh:
+        return
+
+    per_building_services_serializable = {
+        building: sorted(services)
+        for building, services in per_building_services_dh.items()
+    }
+
+    plant_nodes = nodes_gdf[nodes_gdf['type'].fillna('').str.startswith('PLANT')]
+    plant_type = plant_nodes.iloc[0]['type'] if not plant_nodes.empty else 'PLANT'
+
+    metadata = {
+        'network_type': 'DH',
+        'network_name': network_name,
+        'plant_type': plant_type,
+        'network_services': itemised_dh_services,
+        'per_building_services': per_building_services_serializable,
+        'overwrite_supply_settings': overwrite_supply,
+        'timestamp': pd.Timestamp.now().isoformat()
+    }
+
+    metadata_path = os.path.join(os.path.dirname(output_nodes_path), 'building_services.json')
+    with open(metadata_path, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=2)
+
+    print("  building_services.json saved with per-building service configuration")
+
+
+def prune_service_network_geometry(nodes_gdf, edges_gdf, service_buildings):
+    """Create a service-specific copy of a shared layout and prune branches for dropped buildings."""
+    service_buildings = sorted(set(service_buildings))
+    if not service_buildings:
+        return nodes_gdf.iloc[0:0].copy(), edges_gdf.iloc[0:0].copy()
+
+    filtered_nodes_gdf, filtered_edges_gdf = filter_network_to_buildings(
+        nodes_gdf,
+        edges_gdf,
+        service_buildings,
+    )
+
+    edge_attrs = {
+        col: col
+        for col in filtered_edges_gdf.columns
+        if col not in ['geometry', 'weight']
+    }
+    graph = gdf_to_nx(
+        filtered_edges_gdf,
+        coord_precision=SHAPEFILE_TOLERANCE,
+        preserve_geometry=True,
+        **edge_attrs,
+    )
+
+    protected_coords = set()
+    for _, row in filtered_nodes_gdf.iterrows():
+        coord = normalize_coords([row.geometry.coords[0]], SHAPEFILE_TOLERANCE)[0]
+        node_type = str(row.get('type', '')).upper()
+        if row.get('building') in service_buildings or node_type.startswith('PLANT'):
+            protected_coords.add(coord)
+
+    changed = True
+    while changed:
+        changed = False
+        removable_nodes = [
+            node for node in list(graph.nodes())
+            if node not in protected_coords and graph.degree(node) <= 1
+        ]
+        if removable_nodes:
+            graph.remove_nodes_from(removable_nodes)
+            changed = True
+
+    if graph.number_of_edges() > 0:
+        pruned_edges_gdf = nx_to_gdf(graph, crs=filtered_edges_gdf.crs, preserve_geometry=True)
+    else:
+        pruned_edges_gdf = filtered_edges_gdf.iloc[0:0].copy()
+
+    remaining_coords = set(graph.nodes())
+    pruned_nodes = []
+    for _, row in filtered_nodes_gdf.iterrows():
+        coord = normalize_coords([row.geometry.coords[0]], SHAPEFILE_TOLERANCE)[0]
+        if coord in remaining_coords:
+            pruned_nodes.append(row)
+
+    if pruned_nodes:
+        pruned_nodes_gdf = gpd.GeoDataFrame(pruned_nodes, crs=filtered_nodes_gdf.crs)
+    else:
+        pruned_nodes_gdf = filtered_nodes_gdf.iloc[0:0].copy()
+
+    removed_nodes = len(filtered_nodes_gdf) - len(pruned_nodes_gdf)
+    removed_edges = len(filtered_edges_gdf) - len(pruned_edges_gdf)
+    if removed_nodes or removed_edges:
+        print(f"  Pruned {removed_nodes} dangling node(s) and {removed_edges} edge(s) from service-specific layout")
+
+    return pruned_nodes_gdf, pruned_edges_gdf
 
 
 def get_buildings_and_services_from_supply_csv(locator, network_type):
@@ -1703,37 +1808,14 @@ def auto_layout_network(config, network_layout, locator: cea.inputlocator.InputL
         nodes_for_type.to_file(output_nodes_path, driver='ESRI Shapefile')
         print(f"  {type_network}/nodes.shp saved with {len(nodes_for_type)} nodes")
 
-        # NEW: Save per-building service configuration metadata (DH only, supply.csv mode only)
-        if type_network == 'DH' and not overwrite_supply and per_building_services_dh:
-            import json
-
-            # Convert sets to lists for JSON serialization
-            per_building_services_serializable = {
-                building: list(services)
-                for building, services in per_building_services_dh.items()
-            }
-
-            # Get plant type from nodes
-            plant_nodes = nodes_for_type[nodes_for_type['type'].str.startswith('PLANT', na=False)]
-            plant_type = plant_nodes.iloc[0]['type'] if not plant_nodes.empty else 'PLANT'
-
-            # Prepare metadata
-            metadata = {
-                'network_type': type_network,
-                'network_name': network_layout.network_name,
-                'plant_type': plant_type,
-                'network_services': itemised_dh_services,
-                'per_building_services': per_building_services_serializable,
-                'overwrite_supply_settings': overwrite_supply,
-                'timestamp': pd.Timestamp.now().isoformat()
-            }
-
-            # Save to JSON file in same directory as nodes.shp
-            metadata_path = os.path.join(os.path.dirname(output_nodes_path), 'building_services.json')
-            with open(metadata_path, 'w') as f:
-                json.dump(metadata, f, indent=2)
-
-            print("  building_services.json saved with per-building service configuration")
+        save_dh_building_services_metadata(
+            output_nodes_path=output_nodes_path,
+            network_name=network_layout.network_name,
+            itemised_dh_services=itemised_dh_services,
+            per_building_services_dh=per_building_services_dh,
+            overwrite_supply=overwrite_supply,
+            nodes_gdf=nodes_for_type,
+        )
 
         # Clean up temp files for this network
         import glob
@@ -1914,6 +1996,9 @@ def process_user_defined_network(config, locator, network_layout, edges_shp, nod
     cooling_connected_buildings_config = params['cooling_connected_buildings']
     list_include_services = params['include_services']
     itemised_dh_services = params['itemised_dh_services']
+    list_heating_buildings = []
+    list_cooling_buildings = []
+    per_building_services_dh = {}
 
     # Validate include_services is not empty
     if not list_include_services:
@@ -1996,7 +2081,10 @@ def process_user_defined_network(config, locator, network_layout, edges_shp, nod
             print("    To use these parameters, set 'overwrite-supply-settings' to True")
 
         for service in list_include_services:
-            buildings_to_validate_service, _ = get_buildings_and_services_from_supply_csv(locator, network_type=service)
+            buildings_to_validate_service, building_services = get_buildings_and_services_from_supply_csv(
+                locator,
+                network_type=service,
+            )
             buildings_with_demand = set(get_buildings_with_demand(locator, network_type=service))
             buildings_without_demand = set(buildings_to_validate_service) - buildings_with_demand
 
@@ -2006,6 +2094,7 @@ def process_user_defined_network(config, locator, network_layout, edges_shp, nod
             elif service == 'DH':
                 buildings_to_validate_dh = buildings_to_validate_service
                 buildings_without_demand_dh = list(buildings_without_demand)
+                per_building_services_dh = building_services
 
         # Combine DC and DH buildings (union - unique values only)
         buildings_to_validate = list(set(buildings_to_validate_dc) | set(buildings_to_validate_dh))
@@ -2029,6 +2118,8 @@ def process_user_defined_network(config, locator, network_layout, edges_shp, nod
                 print("  - District buildings (DC): 0")
                 list_include_services.remove('DC')
         print(f"  - Buildings in user layout: {len(network_building_names)}")
+        list_cooling_buildings = sorted(buildings_to_validate_dc)
+        list_heating_buildings = sorted(buildings_to_validate_dh)
 
     # Determine which network types to generate (use set for cleaner conditionals)
     network_types_to_generate = determine_network_types(list_include_services)
@@ -2072,78 +2163,84 @@ def process_user_defined_network(config, locator, network_layout, edges_shp, nod
         print("  DC NETWORK")
         print(f"{'='*60}")
 
-        # Filter nodes to only include DC (cooling) buildings + PLANT/NONE nodes
-        # Exclude buildings that are only in heating list
-        dc_building_filter = (
-            (nodes_gdf['building'].isin(list_cooling_buildings)) |  # DC buildings
-            (nodes_gdf['building'].fillna('').str.upper() == 'NONE') |  # Junction nodes
-            (nodes_gdf['type'].fillna('').str.upper().str.startswith('PLANT'))  # Plant nodes
-        )
-        nodes_gdf_dc = nodes_gdf[dc_building_filter].copy()
-        edges_gdf_dc = edges_gdf.copy()
-        print(f"  - Filtered to {len(nodes_gdf_dc)} nodes for DC network ({len([b for b in nodes_gdf_dc['building'] if b in list_cooling_buildings])} cooling buildings)")
+        if not list_cooling_buildings:
+            print("  Skipping DC network: No buildings are currently assigned to district cooling")
+        else:
+            nodes_gdf_dc, edges_gdf_dc = prune_service_network_geometry(
+                nodes_gdf,
+                edges_gdf,
+                list_cooling_buildings,
+            )
+            print(f"  - Filtered to {len(nodes_gdf_dc)} nodes for DC network ({len([b for b in nodes_gdf_dc['building'] if b in list_cooling_buildings])} cooling buildings)")
 
-        nodes_gdf_dc, edges_gdf_dc, created_plants_dc = auto_create_plant_nodes(
-            nodes_gdf_dc, edges_gdf_dc, zone_gdf,
-            cooling_plant_buildings_list, 'DC', locator,
-            expected_num_components,
-            snap_tolerance,
-            itemised_dh_services=None  # DC network doesn't use service config
-        )
-        
-        # Collect edges (including plant connection edges)
-        all_edges_with_plants.append(edges_gdf_dc)
+            nodes_gdf_dc, edges_gdf_dc, created_plants_dc = auto_create_plant_nodes(
+                nodes_gdf_dc, edges_gdf_dc, zone_gdf,
+                cooling_plant_buildings_list, 'DC', locator,
+                expected_num_components,
+                snap_tolerance,
+                itemised_dh_services=None  # DC network doesn't use service config
+            )
+            
+            # Collect edges (including plant connection edges)
+            all_edges_with_plants.append(edges_gdf_dc)
 
-        if created_plants_dc:
-            print(f"\nCreated {len(created_plants_dc)} PLANT node(s) for DC network:")
-            for plant_info in created_plants_dc:
-                reason_text = "user-specified anchor" if plant_info['reason'] == 'user-specified' else "anchor load (highest demand)"
-                print(f"      - {plant_info['node_name']}: near building '{plant_info['building']}' ({reason_text})")
+            if created_plants_dc:
+                print(f"\nCreated {len(created_plants_dc)} PLANT node(s) for DC network:")
+                for plant_info in created_plants_dc:
+                    reason_text = "user-specified anchor" if plant_info['reason'] == 'user-specified' else "anchor load (highest demand)"
+                    print(f"      - {plant_info['node_name']}: near building '{plant_info['building']}' ({reason_text})")
 
-        # Normalize plant types: PLANT and PLANT_DC both become PLANT for DC network
-        nodes_gdf_dc['type'] = nodes_gdf_dc['type'].replace({'PLANT_DC': 'PLANT'})
+            # Normalize plant types: PLANT and PLANT_DC both become PLANT for DC network
+            nodes_gdf_dc['type'] = nodes_gdf_dc['type'].replace({'PLANT_DC': 'PLANT'})
 
-        os.makedirs(os.path.dirname(output_node_path_dc), exist_ok=True)
-        nodes_gdf_dc.to_file(output_node_path_dc, driver='ESRI Shapefile')
+            os.makedirs(os.path.dirname(output_node_path_dc), exist_ok=True)
+            nodes_gdf_dc.to_file(output_node_path_dc, driver='ESRI Shapefile')
 
     if 'DH' in network_types_to_generate:
         print(f"\n{'='*60}")
         print("  DH NETWORK")
         print(f"{'='*60}")
 
-        # Filter nodes to only include DH (heating) buildings + PLANT/NONE nodes
-        # Exclude buildings that are only in cooling list
-        dh_building_filter = (
-            (nodes_gdf['building'].isin(list_heating_buildings)) |  # DH buildings
-            (nodes_gdf['building'].fillna('').str.upper() == 'NONE') |  # Junction nodes
-            (nodes_gdf['type'].fillna('').str.upper().str.startswith('PLANT'))  # Plant nodes
-        )
-        nodes_gdf_dh = nodes_gdf[dh_building_filter].copy()
-        edges_gdf_dh = edges_gdf.copy()
-        print(f"  - Filtered to {len(nodes_gdf_dh)} nodes for DH network ({len([b for b in nodes_gdf_dh['building'] if b in list_heating_buildings])} heating buildings)")
+        if not list_heating_buildings:
+            print("  Skipping DH network: No buildings are currently assigned to district heating")
+        else:
+            nodes_gdf_dh, edges_gdf_dh = prune_service_network_geometry(
+                nodes_gdf,
+                edges_gdf,
+                list_heating_buildings,
+            )
+            print(f"  - Filtered to {len(nodes_gdf_dh)} nodes for DH network ({len([b for b in nodes_gdf_dh['building'] if b in list_heating_buildings])} heating buildings)")
 
-        nodes_gdf_dh, edges_gdf_dh, created_plants_dh = auto_create_plant_nodes(
-            nodes_gdf_dh, edges_gdf_dh, zone_gdf,
-            heating_plant_buildings_list, 'DH', locator,
-            expected_num_components,
-            snap_tolerance,
-            itemised_dh_services=itemised_dh_services
-        )
-        
-        # Collect edges (including plant connection edges)
-        all_edges_with_plants.append(edges_gdf_dh)
+            nodes_gdf_dh, edges_gdf_dh, created_plants_dh = auto_create_plant_nodes(
+                nodes_gdf_dh, edges_gdf_dh, zone_gdf,
+                heating_plant_buildings_list, 'DH', locator,
+                expected_num_components,
+                snap_tolerance,
+                itemised_dh_services=itemised_dh_services
+            )
+            
+            # Collect edges (including plant connection edges)
+            all_edges_with_plants.append(edges_gdf_dh)
 
-        if created_plants_dh:
-            print(f"\nCreated {len(created_plants_dh)} PLANT node(s) for DH network:")
-            for plant_info in created_plants_dh:
-                reason_text = "user-specified anchor" if plant_info['reason'] == 'user-specified' else "anchor load (highest demand)"
-                print(f"      - {plant_info['node_name']}: near building '{plant_info['building']}' ({reason_text})")
+            if created_plants_dh:
+                print(f"\nCreated {len(created_plants_dh)} PLANT node(s) for DH network:")
+                for plant_info in created_plants_dh:
+                    reason_text = "user-specified anchor" if plant_info['reason'] == 'user-specified' else "anchor load (highest demand)"
+                    print(f"      - {plant_info['node_name']}: near building '{plant_info['building']}' ({reason_text})")
 
-        # Note: DH plant types preserve service configuration (e.g., PLANT_hs_ww, PLANT_ww_hs)
-        # No normalization needed for DH network
+            # Note: DH plant types preserve service configuration (e.g., PLANT_hs_ww, PLANT_ww_hs)
+            # No normalization needed for DH network
 
-        os.makedirs(os.path.dirname(output_node_path_dh), exist_ok=True)
-        nodes_gdf_dh.to_file(output_node_path_dh, driver='ESRI Shapefile')
+            os.makedirs(os.path.dirname(output_node_path_dh), exist_ok=True)
+            nodes_gdf_dh.to_file(output_node_path_dh, driver='ESRI Shapefile')
+            save_dh_building_services_metadata(
+                output_nodes_path=output_node_path_dh,
+                network_name=network_layout.network_name,
+                itemised_dh_services=itemised_dh_services,
+                per_building_services_dh=per_building_services_dh,
+                overwrite_supply=overwrite_supply,
+                nodes_gdf=nodes_gdf_dh,
+            )
 
     # Save layout-edges shapefile with all edges (including plant connection edges)
     if all_edges_with_plants:

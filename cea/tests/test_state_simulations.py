@@ -9,6 +9,7 @@ import pandas as pd
 from cea.config import Configuration
 from cea.datamanagement.district_level_states.state_simulation import main as state_simulation_main
 from cea.datamanagement.district_level_states.state_simulation import network_handling
+from cea.datamanagement.district_level_states.state_simulation import service_checks
 from cea.datamanagement.district_level_states.state_simulation import workflow_assembly
 from cea.inputlocator import InputLocator
 
@@ -280,6 +281,49 @@ class TestStateSimulationsWorkflow(unittest.TestCase):
             ["DC", "DH"],
         )
 
+    def test_prepare_workflow_for_state_skips_network_steps_when_previous_network_exists_but_dh_is_inactive(self):
+        cases = [
+            (
+                "district_buildings_without_active_hs_or_ww",
+                make_service_eligibility(dh_district=["B1", "B2"]),
+            ),
+            (
+                "no_buildings_in_dh_network",
+                make_service_eligibility(),
+            ),
+        ]
+
+        for case_name, service_eligibility in cases:
+            with self.subTest(case_name=case_name), patch.object(
+                workflow_assembly.service_checks,
+                "get_state_service_eligibility",
+                return_value=service_eligibility,
+            ), patch.object(
+                workflow_assembly,
+                "should_use_crax_radiation",
+                return_value=False,
+            ), patch.object(
+                workflow_assembly.network_handling,
+                "copy_previous_network_for_state",
+                return_value="thermal_network_2025",
+            ) as copy_mock, patch.object(
+                workflow_assembly.network_handling,
+                "cleanup_current_network_outputs",
+            ) as cleanup_mock:
+                workflow = workflow_assembly.prepare_workflow_for_state(
+                    self.config,
+                    timeline_name="timeline",
+                    year=2030,
+                    state_years=[2025, 2030],
+                )
+
+            self.assertEqual(
+                get_step_names(workflow),
+                ["config", "radiation", "occupancy", "demand", "emissions"],
+            )
+            copy_mock.assert_not_called()
+            cleanup_mock.assert_not_called()
+
     def test_get_state_dh_network_services_orders_union_from_supply(self):
         locator = Mock()
         locator.get_building_supply.return_value = "supply.csv"
@@ -332,6 +376,116 @@ class TestStateSimulationsWorkflow(unittest.TestCase):
             dh_services = workflow_assembly.service_checks.get_state_dh_network_services(locator)
 
         self.assertEqual(dh_services, ["space_heating"])
+
+    def test_get_state_service_eligibility_uses_service_specific_dh_demand_fields(self):
+        locator = Mock()
+        locator.get_building_supply.return_value = "supply.csv"
+        locator.get_total_demand.return_value = "total_demand.csv"
+
+        supply_df = pd.DataFrame(
+            [
+                {"name": "B_hs", "supply_type_hs": "HS_DISTRICT", "supply_type_dhw": "DHW_BUILDING"},
+                {"name": "B_hs_ww", "supply_type_hs": "HS_DISTRICT", "supply_type_dhw": "DHW_DISTRICT"},
+                {"name": "B_ww", "supply_type_hs": "HS_BUILDING", "supply_type_dhw": "DHW_DISTRICT"},
+                {"name": "B_hs_wrong_load", "supply_type_hs": "HS_DISTRICT", "supply_type_dhw": "DHW_BUILDING"},
+                {"name": "B_ww_wrong_load", "supply_type_hs": "HS_BUILDING", "supply_type_dhw": "DHW_DISTRICT"},
+                {"name": "B_building", "supply_type_hs": "HS_BUILDING", "supply_type_dhw": "DHW_BUILDING"},
+            ]
+        )
+        total_demand_df = pd.DataFrame(
+            [
+                {"name": "B_hs", "Qhs_sys_MWhyr": 10.0, "Qww_sys_MWhyr": 0.0, "QH_sys_MWhyr": 10.0, "QC_sys_MWhyr": 0.0},
+                {"name": "B_hs_ww", "Qhs_sys_MWhyr": 0.0, "Qww_sys_MWhyr": 8.0, "QH_sys_MWhyr": 8.0, "QC_sys_MWhyr": 0.0},
+                {"name": "B_ww", "Qhs_sys_MWhyr": 0.0, "Qww_sys_MWhyr": 6.0, "QH_sys_MWhyr": 6.0, "QC_sys_MWhyr": 0.0},
+                {"name": "B_hs_wrong_load", "Qhs_sys_MWhyr": 0.0, "Qww_sys_MWhyr": 7.0, "QH_sys_MWhyr": 7.0, "QC_sys_MWhyr": 0.0},
+                {"name": "B_ww_wrong_load", "Qhs_sys_MWhyr": 5.0, "Qww_sys_MWhyr": 0.0, "QH_sys_MWhyr": 5.0, "QC_sys_MWhyr": 0.0},
+                {"name": "B_building", "Qhs_sys_MWhyr": 9.0, "Qww_sys_MWhyr": 4.0, "QH_sys_MWhyr": 13.0, "QC_sys_MWhyr": 0.0},
+            ]
+        )
+
+        def fake_read_csv(path, *args, **kwargs):
+            if path == "supply.csv":
+                return supply_df.copy()
+            if path == "total_demand.csv":
+                return total_demand_df.copy()
+            raise AssertionError(f"Unexpected path requested: {path}")
+
+        with patch.object(
+            service_checks.pd,
+            "read_csv",
+            side_effect=fake_read_csv,
+        ), patch.object(
+            service_checks,
+            "get_service_scale_mapping",
+            return_value={
+                "HS_DISTRICT": "DISTRICT",
+                "HS_BUILDING": "BUILDING",
+                "DHW_DISTRICT": "DISTRICT",
+                "DHW_BUILDING": "BUILDING",
+            },
+        ):
+            eligibility = service_checks.get_state_service_eligibility(locator)
+
+        self.assertEqual(
+            eligibility["DH"]["district_buildings"],
+            sorted(["B_hs", "B_hs_ww", "B_hs_wrong_load", "B_ww", "B_ww_wrong_load"]),
+        )
+        self.assertEqual(
+            eligibility["DH"]["demand_buildings"],
+            ["B_hs", "B_hs_ww", "B_ww"],
+        )
+        self.assertEqual(
+            eligibility["DH"]["eligible_buildings"],
+            ["B_hs", "B_hs_ww", "B_ww"],
+        )
+        self.assertEqual(service_checks.get_required_services(eligibility), ["DH"])
+
+    def test_find_previous_network_skips_gap_year_without_network_outputs(self):
+        timeline_name = "timeline"
+        state_years = [2025, 2030, 2040]
+        network_name = "thermal_network_2025"
+        locator = Mock()
+        locator.get_state_in_time_scenario_folder.side_effect = (
+            lambda timeline_name, year_of_state: f"state_{year_of_state}"
+        )
+
+        class FakeLocator:
+            def __init__(self, scenario):
+                self.scenario = scenario
+
+            def get_thermal_network_folder(self):
+                return f"{self.scenario}/thermal-network"
+
+            def get_thermal_network_folder_network_name_folder(self, network_name):
+                return f"{self.scenario}/{network_name}"
+
+            def get_network_layout_shapefile(self, network_name):
+                return f"{self.scenario}/{network_name}/layout.shp"
+
+        existing_paths = {
+            "state_2025/thermal-network",
+            "state_2025/thermal_network_2025",
+            "state_2025/thermal_network_2025/layout.shp",
+        }
+
+        with patch.object(
+            network_handling,
+            "InputLocator",
+            FakeLocator,
+        ), patch.object(
+            network_handling.os.path,
+            "exists",
+            side_effect=lambda path: path in existing_paths,
+        ):
+            previous_network_name, source_year = network_handling.find_previous_network(
+                main_locator=locator,
+                timeline_name=timeline_name,
+                year=2040,
+                state_years=state_years,
+            )
+
+        self.assertEqual(previous_network_name, network_name)
+        self.assertEqual(source_year, 2025)
 
     def test_copy_previous_network_for_state_uses_expected_source_and_target_paths(self):
         timeline_name = "timeline"

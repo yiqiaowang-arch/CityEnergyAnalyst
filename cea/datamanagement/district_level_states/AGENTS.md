@@ -21,7 +21,8 @@
 - Step 4 removes a stale current-year `thermal_network_{year}` folder immediately before rerunning `network-layout`. This keeps interrupted or partial reruns from failing on the network-name collision validator while preserving copied previous-year baseline networks.
 - Network steps are conditional. If no eligible district services exist for a state, skip both `network-layout` and `thermal-network`.
 - Service eligibility is per service and per state:
-  `district supply assignment ∩ positive demand`
+  `district supply assignment intersect positive demand`
+- For DH, eligibility is service-aware: district `space_heating` uses `Qhs_sys_MWhyr`, district `domestic_hot_water` uses `Qww_sys_MWhyr`, and mixed buildings are eligible when either assigned DH service has demand.
 - Step 4 always runs `thermal-network` in single-phase mode. Do not route Step 4 through thermal-network multi-phase mode.
 - Existing-network reuse is additive. Copy the previous state's root layout plus `DC/DH/layout` subfolders locally, then run `network-layout` with `existing-network` plus `network-layout-mode = augment`.
 - Step 4 now lets `network-layout` read connected buildings and DH service granularity from the state's `supply.csv` (`overwrite-supply-settings = False`). This preserves per-building DH service metadata for `thermal-network`.
@@ -71,7 +72,7 @@ workflow.append(EMISSIONS_STEP)
 ### DON'T: Hardcode DH services or rely on connected-building overrides in Step 4
 ```python
 # Derive DH services from the state's supply settings instead.
-# Mixed SH-only / SH+DHW networks need per-building metadata for thermal-network.
+# Mixed SH-only / SH+DHW / DHW-only networks need per-building metadata for thermal-network.
 ```
 
 ## Related Files

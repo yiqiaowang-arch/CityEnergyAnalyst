@@ -20,6 +20,7 @@
 - PV execution is controlled only by `config.emissions.include_pv`.
 - Existing-network reuse is additive under `network-layout-mode = augment`. If a later state requests fewer connected buildings than the inherited network contains, the reused layout is kept, `network-layout` warns about the extra inherited buildings, and `thermal-network` simulates only the active consumers in that state.
 - Step 4 delegates district building selection and DH service granularity to the state's `supply.csv` by running `network-layout` with `overwrite-supply-settings = False`. This allows `network-layout` to write per-building DH service metadata for `thermal-network`.
+- Step 4 DH eligibility is service-aware. Match district `space_heating` against `Qhs_sys_MWhyr` and district `domestic_hot_water` against `Qww_sys_MWhyr`; only fall back to `QH_sys_MWhyr` when the service-specific demand columns are unavailable.
 
 ## Key Patterns
 ### DO: Keep the two-pass execution order
@@ -42,6 +43,14 @@ required_services = service_checks.get_required_services(service_eligibility)
 ### DO: Derive DH service order from state supply settings
 ```python
 dh_network_services = service_checks.get_state_dh_network_services(state_locator)
+```
+
+### DO: Gate DH demand by the building's assigned DH services
+```python
+if "space_heating" in building_services and qhs_sys_mwhyr > 0:
+    eligible = True
+if "domestic_hot_water" in building_services and qww_sys_mwhyr > 0:
+    eligible = True
 ```
 
 ### DO: Normalise pandas-derived mappings before exposing typed dicts

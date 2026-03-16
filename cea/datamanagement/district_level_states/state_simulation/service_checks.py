@@ -9,6 +9,11 @@ from cea.inputlocator import InputLocator
 DISTRICT_SERVICES = ("DC", "DH")
 SERVICE_LABELS = {"DC": "cooling", "DH": "heating"}
 DH_SERVICE_ORDER = ("space_heating", "domestic_hot_water")
+DH_SERVICE_DEMAND_FIELDS = {
+    "space_heating": "Qhs_sys_MWhyr",
+    "domestic_hot_water": "Qww_sys_MWhyr",
+}
+LEGACY_DH_DEMAND_FIELD = "QH_sys_MWhyr"
 
 
 class ServiceBuildingSets(TypedDict):
@@ -166,13 +171,51 @@ def get_buildings_with_district_service(locator: InputLocator, network_type: str
     return buildings_with_district
 
 
+def get_buildings_with_positive_demand(
+    total_demand: pd.DataFrame,
+    demand_field: str,
+) -> set[str]:
+    """Return buildings with positive annual demand in one total-demand column."""
+    if demand_field not in total_demand.columns:
+        return set()
+
+    demand_values = pd.to_numeric(total_demand[demand_field], errors="coerce").fillna(0.0)
+    return set(total_demand.loc[demand_values > 0.0, "name"].tolist())
+
+
+def get_buildings_with_demand_for_dh_services(locator: InputLocator, total_demand: pd.DataFrame) -> list[str]:
+    """Return DH buildings whose assigned district services have positive annual demand."""
+    district_dh_services_by_building = get_buildings_with_district_dh_services(locator)
+
+    demand_buildings_by_service = {
+        service: get_buildings_with_positive_demand(total_demand, demand_field)
+        for service, demand_field in DH_SERVICE_DEMAND_FIELDS.items()
+    }
+
+    if LEGACY_DH_DEMAND_FIELD in total_demand.columns:
+        legacy_demand_buildings = get_buildings_with_positive_demand(total_demand, LEGACY_DH_DEMAND_FIELD)
+        for service in DH_SERVICE_DEMAND_FIELDS:
+            if not demand_buildings_by_service[service]:
+                demand_buildings_by_service[service] = legacy_demand_buildings
+
+    demand_buildings = [
+        building_name
+        for building_name, building_services in district_dh_services_by_building.items()
+        if any(
+            building_name in demand_buildings_by_service[service]
+            for service in building_services
+        )
+    ]
+    return sorted(demand_buildings)
+
+
 def get_buildings_with_demand_for_service(locator: InputLocator, network_type: str) -> list[str]:
     """Return buildings with positive annual demand for the requested district service."""
     total_demand = pd.read_csv(locator.get_total_demand())
 
     if network_type == "DH":
-        demand_field = "QH_sys_MWhyr"
+        return get_buildings_with_demand_for_dh_services(locator, total_demand)
     else:
         demand_field = "QC_sys_MWhyr"
 
-    return total_demand.loc[total_demand[demand_field] > 0.0, "name"].tolist()
+    return sorted(get_buildings_with_positive_demand(total_demand, demand_field))

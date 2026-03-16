@@ -117,6 +117,7 @@ Result:
 - **Blank parameter + existing nodes**: Keep existing service buildings
 - **Blank parameter + no existing nodes**: Empty list (warning issued)
 - **Parameter set + no existing nodes**: Use parameter buildings (new service added)
+- **Supply-driven reuse (`overwrite-supply-settings = false`)**: Current `supply.csv` is the source of truth for `dh/layout` and `dc/layout`. Reused layouts with fewer current buildings must prune dropped service branches and rewrite `building_services.json` from the current state before `thermal-network` runs.
 
 ## User-Defined Network Layout Modes
 

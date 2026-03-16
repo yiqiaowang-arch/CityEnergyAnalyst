@@ -5,6 +5,12 @@ Tests the complete workflow: loading street/building data, creating connectivity
 and verifying coordinate precision handling.
 """
 
+import json
+import io
+import os
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 import geopandas as gpd
 import networkx as nx
@@ -12,6 +18,7 @@ from shapely.geometry import Point, LineString
 
 from cea.technologies.network_layout.connectivity_potential import calc_connectivity_network_with_geometry
 from cea.technologies.network_layout.graph_utils import gdf_to_nx, nx_to_gdf
+from cea.technologies.network_layout import main as network_layout_main
 from cea.constants import SHAPEFILE_TOLERANCE
 
 
@@ -266,6 +273,164 @@ class TestNetworkLayoutIntegration:
         # The current implementation does not automatically connect disconnected components
         with pytest.raises(ValueError, match="disconnected components"):
             calc_connectivity_network_with_geometry(streets, buildings)
+
+    def test_process_user_defined_network_prunes_reused_dh_branch_for_removed_buildings(self, monkeypatch):
+        """Service-specific DH output should drop inherited branches for buildings no longer on DH."""
+        nodes_gdf = gpd.GeoDataFrame(
+            {
+                'building': ['B1', 'NONE', 'NONE', 'B2', 'NONE', 'B3'],
+                'name': ['NODE1', 'NODE2', 'NODE3', 'NODE4', 'NODE5', 'NODE6'],
+                'type': ['CONSUMER', 'NONE', 'NONE', 'CONSUMER', 'NONE', 'CONSUMER'],
+                'geometry': [
+                    Point(0.0, 0.0),
+                    Point(1.0, 0.0),
+                    Point(2.0, 0.0),
+                    Point(3.0, 0.0),
+                    Point(2.0, 1.0),
+                    Point(3.0, 1.0),
+                ],
+            },
+            crs='EPSG:32632'
+        )
+        edges_gdf = gpd.GeoDataFrame(
+            {
+                'name': ['PIPE1', 'PIPE2', 'PIPE3', 'PIPE4', 'PIPE5'],
+                'type_mat': ['T1'] * 5,
+                'geometry': [
+                    LineString([(0.0, 0.0), (1.0, 0.0)]),
+                    LineString([(1.0, 0.0), (2.0, 0.0)]),
+                    LineString([(2.0, 0.0), (3.0, 0.0)]),
+                    LineString([(2.0, 0.0), (2.0, 1.0)]),
+                    LineString([(2.0, 1.0), (3.0, 1.0)]),
+                ],
+            },
+            crs='EPSG:32632'
+        )
+        zone_gdf = gpd.GeoDataFrame(
+            {
+                'name': ['B1', 'B2', 'B3'],
+                'geometry': [Point(0.0, 0.0), Point(3.0, 0.0), Point(3.0, 1.0)],
+            },
+            crs='EPSG:32632'
+        )
+
+        scenario_dir = Path(os.getcwd()) / 'test_network_layout_outputs'
+
+        class FakeLocator:
+            def __init__(self, scenario_root):
+                self.scenario_root = scenario_root
+
+            def get_zone_building_names(self):
+                return ['B1', 'B2', 'B3']
+
+            def get_zone_geometry(self):
+                return str(self.scenario_root / 'zone.shp')
+
+            def get_network_layout_shapefile(self, network_name):
+                return str(self.scenario_root / network_name / 'layout.shp')
+
+            def get_network_layout_nodes_shapefile(self, network_type, network_name):
+                return str(self.scenario_root / network_name / network_type / 'layout' / 'nodes.shp')
+
+        config = SimpleNamespace(
+            scenario=str(scenario_dir),
+            network_layout=SimpleNamespace(
+                overwrite_supply_settings=False,
+                heating_connected_buildings=[],
+                cooling_connected_buildings=[],
+                include_services=['DH'],
+                itemised_dh_services=['space_heating'],
+                number_of_components=None,
+                network_layout_mode='augment',
+                auto_modify_network=True,
+                connection_candidates=1,
+            ),
+        )
+        locator = FakeLocator(scenario_dir)
+        network_layout = SimpleNamespace(network_name='thermal_network_2030')
+        written_files = {}
+        written_text = {}
+
+        def fake_to_file(self, path, driver=None):
+            written_files[str(path)] = self.copy()
+
+        class FakeOpen(io.StringIO):
+            def __init__(self, path):
+                super().__init__()
+                self.path = str(path)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                written_text[self.path] = self.getvalue()
+                self.close()
+                return False
+
+        monkeypatch.setattr(
+            network_layout_main,
+            'load_user_defined_network',
+            lambda config, locator, edges_shp, nodes_shp, geojson_path: (nodes_gdf.copy(), edges_gdf.copy()),
+        )
+        monkeypatch.setattr(network_layout_main.gpd, 'read_file', lambda path: zone_gdf.copy())
+        monkeypatch.setattr(
+            network_layout_main,
+            'get_buildings_and_services_from_supply_csv',
+            lambda locator, network_type: (
+                ['B1', 'B2'],
+                {'B1': {'space_heating'}, 'B2': {'space_heating'}},
+            ) if network_type == 'DH' else ([], {}),
+        )
+        monkeypatch.setattr(network_layout_main, 'get_buildings_with_demand', lambda locator, network_type: ['B1', 'B2'])
+        monkeypatch.setattr(
+            network_layout_main,
+            'apply_network_mode_to_user_network',
+            lambda nodes_gdf, edges_gdf, buildings_to_validate, zone_gdf, network_types_to_generate, config, locator, snap_tolerance:
+            (nodes_gdf.copy(), edges_gdf.copy()),
+        )
+        monkeypatch.setattr(network_layout_main, 'resolve_plant_buildings', lambda *args, **kwargs: [])
+        monkeypatch.setattr(
+            network_layout_main,
+            'auto_create_plant_nodes',
+            lambda nodes_gdf, edges_gdf, zone_gdf, plant_building_names, network_type, locator,
+            expected_num_components, snap_tolerance, itemised_dh_services:
+            (nodes_gdf.copy(), edges_gdf.copy(), []),
+        )
+        monkeypatch.setattr(network_layout_main.os, 'makedirs', lambda path, exist_ok=True: None)
+        monkeypatch.setattr(gpd.GeoDataFrame, 'to_file', fake_to_file, raising=False)
+        monkeypatch.setattr('builtins.open', lambda path, mode='r', encoding=None: FakeOpen(path))
+
+        network_layout_main.process_user_defined_network(
+            config=config,
+            locator=locator,
+            network_layout=network_layout,
+            edges_shp='existing_layout.shp',
+            nodes_shp='existing_nodes.shp',
+            geojson_path=None,
+            cooling_plant_building='',
+            heating_plant_building='',
+        )
+
+        layout_path = str(scenario_dir / 'thermal_network_2030' / 'layout.shp')
+        dh_nodes_path = str(scenario_dir / 'thermal_network_2030' / 'DH' / 'layout' / 'nodes.shp')
+        metadata_path = str(scenario_dir / 'thermal_network_2030' / 'DH' / 'layout' / 'building_services.json')
+
+        assert layout_path in written_files
+        assert dh_nodes_path in written_files
+        assert len(written_files[layout_path]) == 3
+
+        dh_nodes = written_files[dh_nodes_path]
+        assert set(dh_nodes.loc[dh_nodes['building'] != 'NONE', 'building']) == {'B1', 'B2'}
+        assert set(dh_nodes.loc[dh_nodes['building'] == 'NONE', 'name']) == {'NODE2', 'NODE3'}
+        assert 'B3' not in dh_nodes['building'].tolist()
+        assert 'NODE5' not in dh_nodes['name'].tolist()
+
+        metadata = json.loads(written_text[metadata_path])
+        assert metadata['network_services'] == ['space_heating']
+        assert metadata['per_building_services'] == {
+            'B1': ['space_heating'],
+            'B2': ['space_heating'],
+        }
 
 
 if __name__ == '__main__':
