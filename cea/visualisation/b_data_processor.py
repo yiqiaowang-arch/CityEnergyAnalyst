@@ -12,6 +12,7 @@ from cea.import_export.result_summary import (
     month_names,
     season_mapping,
 )
+from cea.visualisation.emission_columns import build_requested_emission_base_columns
 
 __author__ = "Zhongming Shi"
 __copyright__ = "Copyright 2025, Architecture and Building Systems - ETH Zurich"
@@ -66,60 +67,9 @@ class data_processor:
             self.appendix = plot_cea_feature
 
     def _generate_lifecycle_emission_columns(self, plot_config):
-        """
-        Generate column names for lifecycle emissions based on four config parameters.
+        """Generate lifecycle-emission base columns shared by normal and pathway plots."""
 
-        Parameters from plot_config:
-        - y_category_to_plot: list of ['operation', 'production', 'demolition', 'biogenic']
-        - operation_services: list of ['electricity', 'space_heating', 'space_cooling', 'dhw',
-                                       'pv_electricity_offset', 'pv_electricity_export']
-        - envelope_components: list of ['wall_ag', 'wall_bg', 'wall_part', 'win_ag', 'roof',
-                                        'upperside', 'underside', 'floor', 'base', 'technical_systems', 'pv']
-        - pv_code: str, single PV panel code (e.g., 'PV1')
-
-        Returns:
-        - list of column names (without unit suffix)
-        """
-        # Service name to tech name mapping
-        service_to_tech = {
-            'electricity': 'E_sys',
-            'space_heating': 'Qhs_sys',
-            'space_cooling': 'Qcs_sys',
-            'dhw': 'Qww_sys',
-        }
-
-        categories = plot_config.y_category_to_plot
-        operation_services = getattr(plot_config, 'operation_services', [])
-        envelope_components = getattr(plot_config, 'envelope_components', [])
-        pv_code = getattr(plot_config, 'pv_code', None)
-
-        columns = []
-
-        # Generate operation columns
-        if 'operation' in categories:
-            for service in operation_services:
-                if service in service_to_tech:
-                    # Regular operation service: operation_E_sys, operation_Qhs_sys, etc.
-                    columns.append(f"operation_{service_to_tech[service]}")
-                elif service == 'pv_electricity_offset' and pv_code:
-                    # PV offset column: PV_{pv_code}_GRID_offset
-                    columns.append(f"PV_{pv_code}_GRID_offset")
-                elif service == 'pv_electricity_export' and pv_code:
-                    # PV export column: PV_{pv_code}_GRID_export
-                    columns.append(f"PV_{pv_code}_GRID_export")
-
-        # Generate embodied columns (production, demolition, biogenic)
-        for category in ['production', 'demolition', 'biogenic']:
-            if category in categories:
-                for component in envelope_components:
-                    if component == 'pv' and pv_code:
-                        # PV embodied emissions: production_PV_{pv_code}, demolition_PV_{pv_code}, etc.
-                        columns.append(f"{category}_PV_{pv_code}")
-                    else:
-                        # Regular component: production_wall_ag, demolition_roof, biogenic_floor, etc.
-                        columns.append(f"{category}_{component}")
-
-        return columns
+        return build_requested_emission_base_columns(plot_config)
 
     def _generate_operational_emission_columns(self, plot_config):
         """

@@ -11,7 +11,7 @@ import time
 from datetime import datetime, UTC
 import cea.inputlocator
 import geopandas as gpd
-from cea.analysis.lca.emission_timeline import _MAPPING_DICT
+from cea.analysis.lca.emission_timeline_backend import emission_timeline_columns
 
 from cea.demand.building_properties.useful_areas import calc_useful_areas
 
@@ -110,13 +110,15 @@ def build_emission_context(locator: cea.inputlocator.InputLocator) -> dict:
         for colname in emission_timeline_hourly_operational_colnames_nounit
     }
 
-    emission_timeline_embodied_parts = list(_MAPPING_DICT.keys())
+    emission_timeline_embodied_colnames_nounit = [
+        col.removesuffix("_kgCO2e")
+        for col in emission_timeline_columns(
+            include_legacy_aliases=True,
+            include_phase_totals=True,
+        )
+    ]
     emission_timeline_yearly_colnames_nounit = (
-        [
-            f"{type_emission}_{part}"
-            for type_emission in emission_timeline_embodied_types
-            for part in emission_timeline_embodied_parts
-        ]
+        emission_timeline_embodied_colnames_nounit
         + [f"operation_{type_energy}" for type_energy in emission_timeline_operational_types]
         + [f"PV_{pv_type}_GRID_offset" for pv_type in emission_timeline_pv_types]
         + [f"PV_{pv_type}_GRID_export" for pv_type in emission_timeline_pv_types]
@@ -125,6 +127,9 @@ def build_emission_context(locator: cea.inputlocator.InputLocator) -> dict:
             for type_emission in emission_timeline_embodied_types
             for pv_type in emission_timeline_pv_types
         ]
+    )
+    emission_timeline_yearly_colnames_nounit = list(
+        dict.fromkeys(emission_timeline_yearly_colnames_nounit)
     )
 
     normalisation_name_mapping_emission_timeline_yearly = {

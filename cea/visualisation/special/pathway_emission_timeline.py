@@ -15,9 +15,11 @@ import geopandas as gpd
 import pandas as pd
 
 import cea.config
+from cea.analysis.lca.emission_timeline_backend import finalise_emission_timeline_dataframe
 from cea.demand.building_properties.useful_areas import calc_useful_areas
 from cea.import_export.result_summary import filter_buildings
 from cea.inputlocator import InputLocator
+from cea.visualisation.emission_columns import build_requested_emission_base_columns
 from cea.visualisation.special.emission_timeline import EmissionTimelinePlot
 
 __author__ = "Yiqiao Wang, Zhongming Shi"
@@ -28,13 +30,6 @@ __version__ = "0.1"
 __maintainer__ = "Reynold Mok"
 __email__ = "cea@arch.ethz.ch"
 __status__ = "Production"
-
-_SERVICE_TO_TECH = {
-    "electricity": "E_sys",
-    "space_heating": "Qhs_sys",
-    "space_cooling": "Qcs_sys",
-    "dhw": "Qww_sys",
-}
 
 _UNIT_SCALE = {
     "tonCO2e": 1.0 / 1000.0,
@@ -48,18 +43,6 @@ class _TimelineConfigAdapter:
     """Adapter so EmissionTimelinePlot can reuse existing config field names."""
 
     plots_emission_timeline: Any
-
-
-def _as_list(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return [str(v) for v in value]
-    if isinstance(value, tuple):
-        return [str(v) for v in value]
-    if isinstance(value, str):
-        return [v.strip() for v in value.split(",") if v.strip()]
-    return [str(value)]
 
 
 def _to_int_or_none(value: Any) -> int | None:
@@ -162,7 +145,7 @@ def _read_timeline_csv(path: str) -> pd.DataFrame:
             f"Timeline file does not contain a 'period' column: {csv_path}"
         )
 
-    return df
+    return finalise_emission_timeline_dataframe(df)
 
 
 def _sort_period(df: pd.DataFrame) -> pd.DataFrame:
@@ -190,16 +173,6 @@ def _aggregate_building_pathway_timelines(
             continue
 
         df = _read_timeline_csv(building_path)
-        tech_quarter_cols = [
-            "production_technical_system_hs_kgCO2e",
-            "production_technical_system_cs_kgCO2e",
-            "production_technical_system_dhw_kgCO2e",
-            "production_technical_system_el_kgCO2e",
-        ]
-        if all(col in df.columns for col in tech_quarter_cols):
-            df["production_technical_systems_kgCO2e"] = (
-                df[tech_quarter_cols].sum(axis=1, min_count=1).fillna(0.0)
-            )
         numeric_cols = [
             col
             for col in df.columns
@@ -212,6 +185,7 @@ def _aggregate_building_pathway_timelines(
 
     combined = pd.concat(frames, ignore_index=True)
     aggregated = combined.groupby("period", as_index=False).sum(numeric_only=True)
+    aggregated = finalise_emission_timeline_dataframe(aggregated)
     return _sort_period(aggregated), missing_files
 
 
@@ -266,36 +240,7 @@ def _load_pathway_timeline_for_selection(
 
 
 def _build_requested_base_columns(plot_config: Any) -> list[str]:
-    categories = _as_list(getattr(plot_config, "y_category_to_plot", []))
-    operation_services = _as_list(getattr(plot_config, "operation_services", []))
-    envelope_components = _as_list(getattr(plot_config, "envelope_components", []))
-
-    pv_code_raw = getattr(plot_config, "pv_code", None)
-    pv_code = str(pv_code_raw).strip() if pv_code_raw is not None else ""
-    if not pv_code:
-        pv_code = ""
-
-    requested: list[str] = []
-
-    if "operation" in categories:
-        for service in operation_services:
-            if service in _SERVICE_TO_TECH:
-                requested.append(f"operation_{_SERVICE_TO_TECH[service]}")
-            elif service == "pv_electricity_offset" and pv_code:
-                requested.append(f"PV_{pv_code}_GRID_offset")
-            elif service == "pv_electricity_export" and pv_code:
-                requested.append(f"PV_{pv_code}_GRID_export")
-
-    for phase in ("production", "demolition", "biogenic"):
-        if phase not in categories:
-            continue
-        for component in envelope_components:
-            if component == "pv" and pv_code:
-                requested.append(f"{phase}_PV_{pv_code}")
-            else:
-                requested.append(f"{phase}_{component}")
-
-    return list(dict.fromkeys(requested))
+    return build_requested_emission_base_columns(plot_config)
 
 
 def _get_normalisation_denominator(
